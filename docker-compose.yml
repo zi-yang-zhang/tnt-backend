@@ -1,0 +1,6 @@
+test:
+  build: .
+  ports:
+  - "80:2001"
+  volumes:
+  - .:/tnt-backend
