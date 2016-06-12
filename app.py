@@ -1,7 +1,4 @@
-from flask import Flask
-from router import router_blueprint
-app = Flask(__name__)
-app.register_blueprint(router_blueprint)
+from core import app
 
 
 @app.route('/')
