@@ -1,8 +1,10 @@
 import os
 from flask import request
-from flask_restful import Resource, reqparse
+from flask_restful import Resource
 from bson.objectid import ObjectId
+from bson.json_util import dumps
 from pymongo import MongoClient
+from pymongo.collection import ReturnDocument
 
 
 client = MongoClient(os.environ['DB_PORT_27017_TCP_ADDR'], 27017)
@@ -11,34 +13,47 @@ db = client.dev
 
 class EquipmentType(Resource):
 
-    def put(self, request, **kwargs):
-        return super(EquipmentType, self).put(request, **kwargs)
-
     def post(self):
         args = request.get_json()
-        created_id = db.equipement_type.insert(args['data']).inserted_id
-        return created_id
-
-    def get(self, obj_id):
-        result = db.equipement_type.find_one({"_id": ObjectId(obj_id)})
+        result = db.equipment_type.insert_one(args['data']).inserted_id
         return str(result)
 
-    def delete(self, request, **kwargs):
-        return super(EquipmentType, self).delete(request, **kwargs)
+    def get(self, obj_id):
+        result = db.equipment_type.find_one({"_id": ObjectId(obj_id)})
+        return dumps(result)
+
+    def delete(self, obj_id):
+        result = db.equipment_type.delete_one({"_id": ObjectId(obj_id)})
+        return str(result)
 
 
 class Equipment(Resource):
-    def put(self, request, **kwargs):
-        return super(Equipment, self).put(request, **kwargs)
 
-    def delete(self, request, **kwargs):
-        return super(Equipment, self).delete(request, **kwargs)
+    def delete(self, obj_id):
+        result = db.equipment_type.delete_one({"_id": ObjectId(obj_id)})
+        return str(result)
 
-    def get(self, request, **kwargs):
-        return super(Equipment, self).get(request, **kwargs)
+    def get(self, obj_id):
+        result = db.equipment_type.find_one({"_id": ObjectId(obj_id)})
+        return dumps(result)
 
-    def post(self, request, **kwargs):
-        return super(Equipment, self).post(request, **kwargs)
+    def post(self):
+        args = request.get_json()
+        operation = args['operation']
+        data = args['data']
+
+        if operation is 'create':
+            equipment_type = data['type']
+            type_result = db.equipment_type.find_one({"name": equipment_type['name']})
+            if type_result is not None:
+                data['type'] = type_result
+            else:
+                data['type'] = str(db.equipment_type.insert_one(args['data']).inserted_id)
+            return db.equipment.insert_one(data).inserted_id
+        elif operation is 'update':
+            return db.equipment_type.find_one_and_update(data, return_document=ReturnDocument.AFTER)
+        elif operation is 'query':
+            return None
 
 
 class Muscle(Resource):
