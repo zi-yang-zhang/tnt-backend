@@ -3,6 +3,9 @@ from flask import request
 from flask_restful import Resource
 from bson.objectid import ObjectId
 from bson.json_util import dumps
+import json
+import utils
+import logging
 from pymongo import MongoClient
 from pymongo.collection import ReturnDocument
 
@@ -20,7 +23,9 @@ class EquipmentType(Resource):
 
     def get(self, obj_id):
         result = db.equipment_type.find_one({"_id": ObjectId(obj_id)})
-        return dumps(result)
+        if result is None:
+            return result
+        return utils.prettify_bson(json.loads(dumps(result)))
 
     def delete(self, obj_id):
         result = db.equipment_type.delete_one({"_id": ObjectId(obj_id)})
@@ -30,29 +35,33 @@ class EquipmentType(Resource):
 class Equipment(Resource):
 
     def delete(self, obj_id):
-        result = db.equipment_type.delete_one({"_id": ObjectId(obj_id)})
+        result = db.equipment.delete_one({"_id": ObjectId(obj_id)})
         return str(result)
 
     def get(self, obj_id):
-        result = db.equipment_type.find_one({"_id": ObjectId(obj_id)})
-        return dumps(result)
+        result = db.equipment.find_one({"_id": ObjectId(obj_id)})
+        if result is None:
+            return result
+        return utils.prettify_bson(json.loads(dumps(result)))
 
     def post(self):
         args = request.get_json()
         operation = args['operation']
+        logging.getLogger().debug(operation)
         data = args['data']
 
-        if operation is 'create':
+        if operation == 'create':
             equipment_type = data['type']
             type_result = db.equipment_type.find_one({"name": equipment_type['name']})
             if type_result is not None:
-                data['type'] = type_result
+                data['type'] = utils.prettify_bson(json.loads(dumps(type_result)))['_id']
             else:
-                data['type'] = str(db.equipment_type.insert_one(args['data']).inserted_id)
-            return db.equipment.insert_one(data).inserted_id
-        elif operation is 'update':
+                data['type'] = str(db.equipment_type.insert_one(data['type']).inserted_id)
+            new_id = db.equipment.insert_one(data).inserted_id
+            return str(new_id)
+        elif operation == 'update':
             return db.equipment_type.find_one_and_update(data, return_document=ReturnDocument.AFTER)
-        elif operation is 'query':
+        elif operation == 'query':
             return None
 
 
