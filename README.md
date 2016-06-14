@@ -38,8 +38,11 @@ To view DB in docker container, use `docker exec -it tntbackend_db_1 bash`
  "data": consists of chain of criteria and conditions
  
  condition can have `equals`, `contains`, `greaterThan`,`greaterOrEqualTo`, `lessOrEqualTo`, `lessThan`, `between`, `isNull`, `notNull`
+ 
  criteria is associate to conditions, with the field name as its first property, and values base on conditions.
+ 
  logical operators can have `and`, `or`, `not`
+ 
  limit operators can have `find`, with limit value, or -1 for all
  
  eg.
