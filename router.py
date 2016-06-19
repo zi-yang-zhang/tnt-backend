@@ -2,6 +2,7 @@ from flask_restful import Api
 from flask import Blueprint
 import model
 router = Api()
+model.initialize()
 router_blueprint = Blueprint('router', __name__)
 
 

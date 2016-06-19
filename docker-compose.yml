@@ -7,4 +7,4 @@ app:
   links:
     - db
 db:
-  image: mongo:3.0.12
+  image: mongo:3.3.8

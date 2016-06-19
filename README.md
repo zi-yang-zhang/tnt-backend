@@ -35,27 +35,19 @@ To view DB in docker container, use `docker exec -it tntbackend_db_1 bash`
     }
         
 #### `query`
- "data": consists of chain of criteria and conditions
+ "data": criteria and conditions based on resources
  
- condition can have `equals`, `contains`, `greaterThan`,`greaterOrEqualTo`, `lessOrEqualTo`, `lessThan`, `between`, `isNull`, `notNull`
+ criteria consists of the following structure(mongodb query style):
  
- criteria is associate to conditions, with the field name as its first property, and values base on conditions.
+    "fieldName":{"qualifier":"criteria"}
  
- logical operators can have `and`, `or`, `not`
- 
- limit operators can have `find`, with limit value, or -1 for all
+ Equipment: name or type
  
  eg.
- 
+    
     "data":{
-            "contains":{"name":"Robert"},
-            "or":{
-                    "greaterThan":{"age":20},
-                    "lessThan":{"age":40},
-                },
-            "not":{"height":174},
-            "between":{"weight":[140,180]}
-            "find":-1
+            "name":{"equals":"something"}
+            "find":0
     }
  
 
