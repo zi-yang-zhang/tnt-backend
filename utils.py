@@ -14,8 +14,13 @@ def translate_query(query):
         return equals_query
     if contains_query is not None:
         return {"$regex": ".*{}.*".format(contains_query.encode('utf-8'))}
-    return
+    raise InvalidQueryOperatorError(query)
 
 
 def bson_to_json(bson_string):
     return prettify_bson(json.loads(bson.json_util.dumps(bson_string)))
+
+
+class InvalidQueryOperatorError(Exception):
+    def __init__(self, query):
+        self.message = "Invalid query operation: " + str(query)
