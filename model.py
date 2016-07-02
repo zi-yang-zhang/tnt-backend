@@ -25,6 +25,11 @@ class InvalidResourceCreationError(Exception):
         self.message = param + " is required for creating " + resource_type
 
 
+class InvalidResourceParameterError(Exception):
+    def __init__(self, param, resource_type):
+        self.message = param + " cannot be found in " + resource_type
+
+
 class InvalidOperationError(Exception):
     def __init__(self, param):
         self.message = "Operation " + param + " is not supported"
@@ -52,7 +57,7 @@ class Response(object):
 
 class ErrorResponse(Response):
     def __init__(self, exception):
-        super(ErrorResponse, self).__init__(False)
+        super(ErrorResponse, self).__init__(success=False)
         self.exception_message = exception.message
 
 
@@ -271,10 +276,8 @@ class MuscleGroup(Resource):
                 criteria = {"muscles": {"$all": muscles_id_list}}
             results = []
             for raw_result in db.muscle_group.find(filter=criteria, limit=limit):
-                muscles = []
+                muscles = get_muscles_for_result(raw_result, 'muscles')
                 result = utils.bson_to_json(raw_result)
-                for muscle_id in raw_result['muscles']:
-                    muscles.append(utils.bson_to_json(db.muscle.find_one(filter={"_id": muscle_id})))
                 del result['muscles']
                 result.update({'muscles': muscles})
                 results.append(result)
@@ -409,6 +412,16 @@ class Exercise(Resource):
 
                 if data.get('equipments') is None:
                     data.update({'equipments': []})
+                else:
+                    equipments = data['equipments']
+                    equipment_ids_to_save = []
+                    for equipment in equipments:
+                        equipment_query = db.equipment.find_one(filter={"name": equipment})
+                        if equipment_query is not None:
+                            equipment_ids_to_save.append(equipment_query['_id'])
+                        else:
+                            raise InvalidResourceParameterError(equipment, "Equipment")
+                    data['equipments'] = equipment_ids_to_save
 
                 if data.get('metrics') is None:
                     data.update({'metrics': []})
@@ -436,8 +449,7 @@ class Exercise(Resource):
                     if muscle_query is not None:
                         muscle_ids_to_save.append(muscle_query['_id'])
                     else:
-                        new_muscle = {"name": muscle, "imageURLs": []}
-                        muscle_ids_to_save.append(db.muscle.insert_one(new_muscle).inserted_id)
+                        raise InvalidResourceParameterError(muscle, "Muscle")
                 data['majorMuscles'] = muscle_ids_to_save
                 new_id = db.exercise.insert_one(data).inserted_id
                 return str(new_id)
@@ -445,18 +457,35 @@ class Exercise(Resource):
             elif operation == 'update':
                 raise NotImplementedError
             elif operation == 'query':
-                name_field = data.get('name')
+                keyword_field = data.get('keyword')
                 limit = data.get('find')
+                results = []
                 if limit is None:
                     limit = 0
-                criteria = {}
-                if name_field is not None:
-                    criteria = {"name": utils.translate_query(name_field)}
-
-                results = []
-                for result in db.exercise.find(filter=criteria, limit=limit):
-                    results.append(utils.bson_to_json(result))
-                return results
+                if keyword_field is not None:
+                    subquery = []
+                    for keyword in keyword_field:
+                        subquery.append({"name": {"$regex": ".*{}.*".format(keyword.encode('utf-8'))}})
+                    muscle_result = db.muscle.find(filter={"$or": subquery}, projection={"_id": 1})
+                    equipment_result = db.equipment.find(filter={"$or": subquery}, projection={"_id": 1})
+                    for muscle_id in muscle_result:
+                        subquery.append({"majorMuscles": muscle_id.get("_id")})
+                    for equipment_id in equipment_result:
+                        subquery.append({"equipments": equipment_id.get("_id")})
+                    criteria = {"$or": subquery}
+                    for raw_result in db.exercise.find(filter=criteria, limit=limit):
+                        major_muscles = get_muscles_for_result(raw_result, "majorMuscles")
+                        minor_muscles = get_muscles_for_result(raw_result, "minorMuscles")
+                        equipments = get_equipments_for_result(raw_result, "equipments")
+                        result = utils.bson_to_json(raw_result)
+                        del result["equipments"]
+                        result.update({"equipments": equipments})
+                        del result["minorMuscles"]
+                        result.update({"minorMuscles": minor_muscles})
+                        del result["majorMuscles"]
+                        result.update({"majorMuscles": major_muscles})
+                        results.append(result)
+                return json.loads(str(Response(success=True, data=results)))
             else:
                 raise InvalidOperationError(operation)
 
@@ -465,6 +494,8 @@ class Exercise(Resource):
         except InvalidResourceCreationError as e:
             return json.loads(str(ErrorResponse(e)))
         except InvalidOperationError as e:
+            return json.loads(str(ErrorResponse(e)))
+        except InvalidResourceParameterError as e:
             return json.loads(str(ErrorResponse(e)))
 
 
@@ -477,3 +508,17 @@ class Exercise(Resource):
     def delete(self, obj_id):
         result = db.exercise.delete_one({"_id": ObjectId(obj_id)})
         return result.raw_result
+
+
+def get_muscles_for_result(raw_result, param_name):
+    muscles = []
+    for muscle_id in raw_result[param_name]:
+        muscles.append(utils.bson_to_json(db.muscle.find_one(filter={"_id": muscle_id})))
+    return muscles
+
+
+def get_equipments_for_result(raw_result, param_name):
+    equipments = []
+    for equipment_id in raw_result[param_name]:
+        equipments.append(utils.bson_to_json(db.equipment.find_one(filter={"_id": equipment_id})))
+    return equipments
