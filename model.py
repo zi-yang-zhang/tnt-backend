@@ -86,7 +86,7 @@ class EquipmentType(Resource):
             results = []
             for result in db.equipment_type.find(filter=criteria, limit=limit):
                 results.append(utils.bson_to_json(result))
-            return results
+            return json.loads(str(Response(success=True, data=results)))
 
     def get(self, obj_id):
         result = db.equipment_type.find_one({"_id": ObjectId(obj_id)})
@@ -115,6 +115,7 @@ class Equipment(Resource):
         args = request.get_json()
         operation = args['operation']
         data = args['data']
+        LOGGER.debug('request received %s', args)
 
         if operation == 'create':
             equipment_type = data.get('type')
@@ -174,7 +175,8 @@ class Equipment(Resource):
                 del result['type']
                 result.update({'type': utils.bson_to_json(equipment_type)})
                 results.append(result)
-            return results
+            LOGGER.debug('response sent %s', str(Response(success=True, data=results)))
+            return json.loads(str(Response(success=True, data=results)))
 
 
 class Muscle(Resource):
@@ -192,6 +194,7 @@ class Muscle(Resource):
         args = request.get_json()
         operation = args['operation']
         data = args['data']
+        LOGGER.debug('request received %s', args)
 
         if operation == 'create':
             if data.get('name') is None:
@@ -213,7 +216,8 @@ class Muscle(Resource):
             results = []
             for result in db.muscle.find(filter=criteria, limit=limit):
                 results.append(utils.bson_to_json(result))
-            return results
+            LOGGER.debug('response sent %s', str(Response(success=True, data=results)))
+            return json.loads(str(Response(success=True, data=results)))
 
 
 class MuscleGroup(Resource):
@@ -231,6 +235,7 @@ class MuscleGroup(Resource):
         args = request.get_json()
         operation = args['operation']
         data = args['data']
+        LOGGER.debug('request received %s', args)
 
         if operation == 'create':
             if data.get('name') is None:
@@ -281,7 +286,8 @@ class MuscleGroup(Resource):
                 del result['muscles']
                 result.update({'muscles': muscles})
                 results.append(result)
-            return results
+            LOGGER.debug('response sent %s', str(Response(success=True, data=results)))
+            return json.loads(str(Response(success=True, data=results)))
 
 
 class ExerciseMetric(Resource):
@@ -317,7 +323,7 @@ class ExerciseMetric(Resource):
             results = []
             for result in db.exercise_metric.find(filter=criteria, limit=limit):
                 results.append(utils.bson_to_json(result))
-            return results
+            return json.loads(str(Response(success=True, data=results)))
 
     def get(self, obj_id):
         result = db.exercise_metric.find_one({"_id": ObjectId(obj_id)})
@@ -360,7 +366,7 @@ class CategoryTag(Resource):
                 results = []
                 for result in db.category_type.find(filter=criteria, limit=limit):
                     results.append(utils.bson_to_json(result))
-                return results
+                return json.loads(str(Response(success=True, data=results)))
             else:
                 raise InvalidOperationError(operation)
 
@@ -389,6 +395,8 @@ class Exercise(Resource):
             args = request.get_json()
             operation = args.get('operation')
             data = args.get('data')
+            LOGGER.debug('request received %s', args)
+
             if operation is None:
                 raise InvalidRequestError('operation')
             if data is None:
@@ -485,6 +493,7 @@ class Exercise(Resource):
                         del result["majorMuscles"]
                         result.update({"majorMuscles": major_muscles})
                         results.append(result)
+                    LOGGER.debug('response sent %s', str(Response(success=True, data=results)))
                 return json.loads(str(Response(success=True, data=results)))
             else:
                 raise InvalidOperationError(operation)

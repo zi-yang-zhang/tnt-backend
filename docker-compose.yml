@@ -1,7 +1,7 @@
 app:
   build: .
   ports:
-    - "80:2001"
+    - "3000:2001"
   volumes:
     - .:/tnt-backend
   links:
