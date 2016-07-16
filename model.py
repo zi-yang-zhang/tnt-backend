@@ -42,7 +42,7 @@ class InvalidRequestError(Exception):
 
 class DuplicateResourceCreationError(Exception):
     def __init__(self, name, resource_type):
-        self.message = "Resource exists with name " + name + "for " + resource_type
+        self.message = "Resource exists with name <" + name + "> for " + resource_type
 
 
 class Response(object):
@@ -72,26 +72,39 @@ class EquipmentType(Resource):
         args = request.get_json()
         operation = args['operation']
         data = args['data']
-
-        if operation == 'create':
-            if data.get('name') is None:
-                raise InvalidResourceCreationError('name', 'EquipmentType')
-            new_id = db.equipment_type.insert_one(data).inserted_id
-            return json.loads(str(Response(success=True, data=str(new_id))))
-        elif operation == 'update':
-            raise NotImplementedError
-        elif operation == 'query':
-            name_field = data.get('name')
-            limit = data.get('find')
-            if limit is None:
-                limit = 0
-            criteria = {}
-            if name_field is not None:
-                criteria = {"name": utils.translate_query(name_field)}
-            results = []
-            for result in db.equipment_type.find(filter=criteria, limit=limit):
-                results.append(utils.bson_to_json(result))
-            return json.loads(str(Response(success=True, data=results)))
+        try:
+            if operation == 'create':
+                if data.get('name') is None:
+                    raise InvalidResourceCreationError('name', 'EquipmentType')
+                duplicate_check_query = db.equipment_type.find_one(filter={"name": data.get('name')})
+                if duplicate_check_query is not None:
+                    raise DuplicateResourceCreationError(data.get('name'), 'EquipmentType')
+                new_id = db.equipment_type.insert_one(data).inserted_id
+                return json.loads(str(Response(success=True, data=str(new_id))))
+            elif operation == 'update':
+                raise NotImplementedError
+            elif operation == 'query':
+                name_field = data.get('name')
+                limit = data.get('find')
+                if limit is None:
+                    limit = 0
+                criteria = {}
+                if name_field is not None:
+                    criteria = {"name": utils.translate_query(name_field)}
+                results = []
+                for result in db.equipment_type.find(filter=criteria, limit=limit):
+                    results.append(utils.bson_to_json(result))
+                return json.loads(str(Response(success=True, data=results)))
+        except InvalidRequestError as e:
+            return json.loads(str(ErrorResponse(e)))
+        except InvalidResourceCreationError as e:
+            return json.loads(str(ErrorResponse(e)))
+        except InvalidOperationError as e:
+            return json.loads(str(ErrorResponse(e)))
+        except InvalidResourceParameterError as e:
+            return json.loads(str(ErrorResponse(e)))
+        except DuplicateResourceCreationError as e:
+            return json.loads(str(ErrorResponse(e)))
 
     def get(self, obj_id):
         result = db.equipment_type.find_one({"_id": ObjectId(obj_id)})
@@ -121,67 +134,80 @@ class Equipment(Resource):
         operation = args['operation']
         data = args['data']
         LOGGER.debug('request received %s', args)
-
-        if operation == 'create':
-            equipment_type = data.get('type')
-            detail = data.get('detail')
-            images = data.get('imageURLs')
-            if data.get('name') is None:
-                raise InvalidResourceCreationError('name', 'Equipment')
-            if equipment_type is None:
-                raise InvalidResourceCreationError('equipment_type', 'Equipment')
-            if detail is None:
-                data.update({"detail": ""})
-            if images is None:
-                data.update({"imageURLs": []})
-            type_result = db.equipment_type.find_one({"name": equipment_type})
-            if type_result is not None:
-                data['type'] = type_result['_id']
-            else:
-                data['type'] = db.equipment_type.insert_one({"name": equipment_type}).inserted_id
-            new_equipment = db.equipment.insert_one(data)
-            LOGGER.debug(new_equipment)
-            new_id = new_equipment.inserted_id
-            return json.loads(str(Response(success=True, data=str(new_id))))
-        elif operation == 'update':
-            raise NotImplementedError
-        elif operation == 'query':
-            name_field = data.get('name')
-            type_field = data.get('type')
-            limit = data.get('find')
-            if limit is None:
-                limit = 0
-            criteria = {}
-            if name_field is not None and type_field is not None:
-                type_results = db.equipment_type.find(filter={"name": utils.translate_query(type_field)})
-                and_criteria = [{"name": utils.translate_query(name_field)}]
-                type_criteria = []
-                for type_result in type_results:
-                    type_criteria.append({"type": utils.bson_to_json(type_result)['_id']})
-                if type_criteria.__len__() > 0:
-                    and_criteria.append({"$or": type_criteria})
-                criteria = {"$and": and_criteria}
-            elif name_field is not None:
-                criteria = {"name": utils.translate_query(name_field)}
-            elif type_field is not None:
-                type_results = db.equipment_type.find(filter={"name": utils.translate_query(type_field)})
-                if type_results.count() == 0:
-                    return []
-                type_criteria = []
-                for type_result in type_results:
-                    type_criteria.append({"type": type_result['_id']})
-                if type_criteria.__len__() > 0:
-                    criteria = {"$or": type_criteria}
-            results = []
-            for raw_result in db.equipment.find(filter=criteria, limit=limit):
-                result = utils.bson_to_json(raw_result)
-                equipment_type_id = raw_result['type']
-                equipment_type = db.equipment_type.find_one(filter={"_id": equipment_type_id})
-                del result['type']
-                result.update({'type': utils.bson_to_json(equipment_type)})
-                results.append(result)
-            LOGGER.debug('response sent %s', str(Response(success=True, data=results)))
-            return json.loads(str(Response(success=True, data=results)))
+        try:
+            if operation == 'create':
+                equipment_type = data.get('type')
+                detail = data.get('detail')
+                images = data.get('imageURLs')
+                if data.get('name') is None:
+                    raise InvalidResourceCreationError('name', 'Equipment')
+                if equipment_type is None:
+                    raise InvalidResourceCreationError('equipment_type', 'Equipment')
+                if detail is None:
+                    data.update({"detail": ""})
+                if images is None:
+                    data.update({"imageURLs": []})
+                duplicate_check_query = db.equipment.find_one(filter={"name": data.get('name')})
+                if duplicate_check_query is not None:
+                    raise DuplicateResourceCreationError(data.get('name'), 'Equipment')
+                type_result = db.equipment_type.find_one({"name": equipment_type})
+                if type_result is not None:
+                    data['type'] = type_result['_id']
+                else:
+                    data['type'] = db.equipment_type.insert_one({"name": equipment_type}).inserted_id
+                new_equipment = db.equipment.insert_one(data)
+                LOGGER.debug(new_equipment)
+                new_id = new_equipment.inserted_id
+                return json.loads(str(Response(success=True, data=str(new_id))))
+            elif operation == 'update':
+                raise NotImplementedError
+            elif operation == 'query':
+                name_field = data.get('name')
+                type_field = data.get('type')
+                limit = data.get('find')
+                if limit is None:
+                    limit = 0
+                criteria = {}
+                if name_field is not None and type_field is not None:
+                    type_results = db.equipment_type.find(filter={"name": utils.translate_query(type_field)})
+                    and_criteria = [{"name": utils.translate_query(name_field)}]
+                    type_criteria = []
+                    for type_result in type_results:
+                        type_criteria.append({"type": utils.bson_to_json(type_result)['_id']})
+                    if type_criteria.__len__() > 0:
+                        and_criteria.append({"$or": type_criteria})
+                    criteria = {"$and": and_criteria}
+                elif name_field is not None:
+                    criteria = {"name": utils.translate_query(name_field)}
+                elif type_field is not None:
+                    type_results = db.equipment_type.find(filter={"name": utils.translate_query(type_field)})
+                    if type_results.count() == 0:
+                        return []
+                    type_criteria = []
+                    for type_result in type_results:
+                        type_criteria.append({"type": type_result['_id']})
+                    if type_criteria.__len__() > 0:
+                        criteria = {"$or": type_criteria}
+                results = []
+                for raw_result in db.equipment.find(filter=criteria, limit=limit):
+                    result = utils.bson_to_json(raw_result)
+                    equipment_type_id = raw_result['type']
+                    equipment_type = db.equipment_type.find_one(filter={"_id": equipment_type_id})
+                    del result['type']
+                    result.update({'type': utils.bson_to_json(equipment_type)})
+                    results.append(result)
+                LOGGER.debug('response sent %s', str(Response(success=True, data=results)))
+                return json.loads(str(Response(success=True, data=results)))
+        except InvalidRequestError as e:
+            return json.loads(str(ErrorResponse(e)))
+        except InvalidResourceCreationError as e:
+            return json.loads(str(ErrorResponse(e)))
+        except InvalidOperationError as e:
+            return json.loads(str(ErrorResponse(e)))
+        except InvalidResourceParameterError as e:
+            return json.loads(str(ErrorResponse(e)))
+        except DuplicateResourceCreationError as e:
+            return json.loads(str(ErrorResponse(e)))
 
 
 class Muscle(Resource):
@@ -200,29 +226,42 @@ class Muscle(Resource):
         operation = args['operation']
         data = args['data']
         LOGGER.debug('request received %s', args)
-
-        if operation == 'create':
-            if data.get('name') is None:
-                raise InvalidResourceCreationError('name', 'Muscle')
-            if data.get('imageURLs') is None:
-                data.update({'imageURLs': []})
-            new_id = db.muscle.insert_one(data).inserted_id
-            return json.loads(str(Response(success=True, data=str(new_id))))
-        elif operation == 'update':
-            raise NotImplementedError
-        elif operation == 'query':
-            name_field = data.get('name')
-            limit = data.get('find')
-            if limit is None:
-                limit = 0
-            criteria = {}
-            if name_field is not None:
-                criteria = {"name": utils.translate_query(name_field)}
-            results = []
-            for result in db.muscle.find(filter=criteria, limit=limit):
-                results.append(utils.bson_to_json(result))
-            LOGGER.debug('response sent %s', str(Response(success=True, data=results)))
-            return json.loads(str(Response(success=True, data=results)))
+        try:
+            if operation == 'create':
+                if data.get('name') is None:
+                    raise InvalidResourceCreationError('name', 'Muscle')
+                if data.get('imageURLs') is None:
+                    data.update({'imageURLs': []})
+                duplicate_check_query = db.muscle.find_one(filter={"name": data.get('name')})
+                if duplicate_check_query is not None:
+                    raise DuplicateResourceCreationError(data.get('name'), 'Muscle')
+                new_id = db.muscle.insert_one(data).inserted_id
+                return json.loads(str(Response(success=True, data=str(new_id))))
+            elif operation == 'update':
+                raise NotImplementedError
+            elif operation == 'query':
+                name_field = data.get('name')
+                limit = data.get('find')
+                if limit is None:
+                    limit = 0
+                criteria = {}
+                if name_field is not None:
+                    criteria = {"name": utils.translate_query(name_field)}
+                results = []
+                for result in db.muscle.find(filter=criteria, limit=limit):
+                    results.append(utils.bson_to_json(result))
+                LOGGER.debug('response sent %s', str(Response(success=True, data=results)))
+                return json.loads(str(Response(success=True, data=results)))
+        except InvalidRequestError as e:
+            return json.loads(str(ErrorResponse(e)))
+        except InvalidResourceCreationError as e:
+            return json.loads(str(ErrorResponse(e)))
+        except InvalidOperationError as e:
+            return json.loads(str(ErrorResponse(e)))
+        except InvalidResourceParameterError as e:
+            return json.loads(str(ErrorResponse(e)))
+        except DuplicateResourceCreationError as e:
+            return json.loads(str(ErrorResponse(e)))
 
 
 class MuscleGroup(Resource):
@@ -456,6 +495,16 @@ class Exercise(Resource):
 
                 if data.get('minorMuscles') is None:
                     data.update({'minorMuscles': []})
+                else:
+                    muscles = data['minorMuscles']
+                    muscle_ids_to_save = []
+                    for muscle in muscles:
+                        muscle_query = db.muscle.find_one(filter={"name": muscle})
+                        if muscle_query is not None:
+                            muscle_ids_to_save.append(muscle_query['_id'])
+                        else:
+                            raise InvalidResourceParameterError(muscle, "Muscle")
+                    data['minorMuscles'] = muscle_ids_to_save
 
                 if data.get('categoryTags') is None:
                     data.update({'categoryTags': []})
@@ -466,6 +515,10 @@ class Exercise(Resource):
                     data.update({'advancedContent': ""})
                 if data.get('basicContent') is None:
                     data.update({'basicContent': ""})
+
+                duplicate_check_query = db.exercise.find_one(filter={"name": data.get('name')})
+                if duplicate_check_query is not None:
+                    raise DuplicateResourceCreationError(data.get('name'), 'Exercise')
 
                 muscles = data['majorMuscles']
                 muscle_ids_to_save = []
@@ -522,6 +575,8 @@ class Exercise(Resource):
         except InvalidOperationError as e:
             return json.loads(str(ErrorResponse(e)))
         except InvalidResourceParameterError as e:
+            return json.loads(str(ErrorResponse(e)))
+        except DuplicateResourceCreationError as e:
             return json.loads(str(ErrorResponse(e)))
 
 
