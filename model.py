@@ -40,6 +40,11 @@ class InvalidRequestError(Exception):
         self.message = param + " is required for the request"
 
 
+class DuplicateResourceCreationError(Exception):
+    def __init__(self, name, resource_type):
+        self.message = "Resource exists with name " + name + "for " + resource_type
+
+
 class Response(object):
     def __init__(self, success, data=None):
         if data is None:
@@ -72,7 +77,7 @@ class EquipmentType(Resource):
             if data.get('name') is None:
                 raise InvalidResourceCreationError('name', 'EquipmentType')
             new_id = db.equipment_type.insert_one(data).inserted_id
-            return str(new_id)
+            return json.loads(str(Response(success=True, data=str(new_id))))
         elif operation == 'update':
             raise NotImplementedError
         elif operation == 'query':
@@ -137,7 +142,7 @@ class Equipment(Resource):
             new_equipment = db.equipment.insert_one(data)
             LOGGER.debug(new_equipment)
             new_id = new_equipment.inserted_id
-            return str(new_id)
+            return json.loads(str(Response(success=True, data=str(new_id))))
         elif operation == 'update':
             raise NotImplementedError
         elif operation == 'query':
@@ -202,7 +207,7 @@ class Muscle(Resource):
             if data.get('imageURLs') is None:
                 data.update({'imageURLs': []})
             new_id = db.muscle.insert_one(data).inserted_id
-            return str(new_id)
+            return json.loads(str(Response(success=True, data=str(new_id))))
         elif operation == 'update':
             raise NotImplementedError
         elif operation == 'query':
@@ -236,58 +241,70 @@ class MuscleGroup(Resource):
         operation = args['operation']
         data = args['data']
         LOGGER.debug('request received %s', args)
-
-        if operation == 'create':
-            if data.get('name') is None:
-                raise InvalidResourceCreationError('name', 'MuscleGroup')
-            if data.get('muscles') is None or data.get('muscles').__len__() < 1:
-                raise InvalidResourceCreationError('muscles', 'MuscleGroup')
-            if data.get('imageURLs') is None:
-                data.update({'imageURLs': []})
-
-            muscles = data['muscles']
-            muscle_ids_to_save = []
-            for muscle in muscles:
-                muscle_query = db.muscle.find_one(filter={"name": muscle})
-                if muscle_query is not None:
-                    muscle_ids_to_save.append(muscle_query['_id'])
-                else:
-                    new_muscle = {"name": muscle, "imageURLs": []}
-                    muscle_ids_to_save.append(db.muscle.insert_one(new_muscle).inserted_id)
-            data['muscles'] = muscle_ids_to_save
-            new_id = db.muscle_group.insert_one(data).inserted_id
-            return str(new_id)
-        elif operation == 'update':
-            raise NotImplementedError
-        elif operation == 'query':
-            name_field = data.get('name')
-            muscles_field = data.get('muscles')
-            limit = data.get('find')
-            if limit is None:
-                limit = 0
-            criteria = {}
-            if name_field is not None:
-                criteria = {"name": utils.translate_query(name_field)}
-            elif muscles_field is not None:
-                muscles_id_list = []
-                muscles_result = []
-                for muscle in muscles_field:
-                    muscle_result = db.muscle.find_one(filter={"name": muscle})
-                    if muscle_result is None:
-                        return []
+        try:
+            if operation == 'create':
+                if data.get('name') is None:
+                    raise InvalidResourceCreationError('name', 'MuscleGroup')
+                if data.get('muscles') is None or data.get('muscles').__len__() < 1:
+                    raise InvalidResourceCreationError('muscles', 'MuscleGroup')
+                if data.get('imageURLs') is None:
+                    data.update({'imageURLs': []})
+                duplicate_check_query = db.muscle_group.find_one(filter={"name": data.get('name')})
+                if duplicate_check_query is not None:
+                    raise DuplicateResourceCreationError(data.get('name'), 'MuscleGroup')
+                muscles = data['muscles']
+                muscle_ids_to_save = []
+                for muscle in muscles:
+                    muscle_query = db.muscle.find_one(filter={"name": muscle})
+                    if muscle_query is not None:
+                        muscle_ids_to_save.append(muscle_query['_id'])
                     else:
-                        muscles_id_list.append(muscle_result['_id'])
-                        muscles_result.append(muscle_result)
-                criteria = {"muscles": {"$all": muscles_id_list}}
-            results = []
-            for raw_result in db.muscle_group.find(filter=criteria, limit=limit):
-                muscles = get_muscles_for_result(raw_result, 'muscles')
-                result = utils.bson_to_json(raw_result)
-                del result['muscles']
-                result.update({'muscles': muscles})
-                results.append(result)
-            LOGGER.debug('response sent %s', str(Response(success=True, data=results)))
-            return json.loads(str(Response(success=True, data=results)))
+                        new_muscle = {"name": muscle, "imageURLs": []}
+                        muscle_ids_to_save.append(db.muscle.insert_one(new_muscle).inserted_id)
+                data['muscles'] = muscle_ids_to_save
+                new_id = db.muscle_group.insert_one(data).inserted_id
+                return json.loads(str(Response(success=True, data=str(new_id))))
+            elif operation == 'update':
+                raise NotImplementedError
+            elif operation == 'query':
+                name_field = data.get('name')
+                muscles_field = data.get('muscles')
+                limit = data.get('find')
+                if limit is None:
+                    limit = 0
+                criteria = {}
+                if name_field is not None:
+                    criteria = {"name": utils.translate_query(name_field)}
+                elif muscles_field is not None:
+                    muscles_id_list = []
+                    muscles_result = []
+                    for muscle in muscles_field:
+                        muscle_result = db.muscle.find_one(filter={"name": muscle})
+                        if muscle_result is None:
+                            return []
+                        else:
+                            muscles_id_list.append(muscle_result['_id'])
+                            muscles_result.append(muscle_result)
+                    criteria = {"muscles": {"$all": muscles_id_list}}
+                results = []
+                for raw_result in db.muscle_group.find(filter=criteria, limit=limit):
+                    muscles = get_muscles_for_result(raw_result, 'muscles')
+                    result = utils.bson_to_json(raw_result)
+                    del result['muscles']
+                    result.update({'muscles': muscles})
+                    results.append(result)
+                LOGGER.debug('response sent %s', str(Response(success=True, data=results)))
+                return json.loads(str(Response(success=True, data=results)))
+        except InvalidRequestError as e:
+            return json.loads(str(ErrorResponse(e)))
+        except InvalidResourceCreationError as e:
+            return json.loads(str(ErrorResponse(e)))
+        except InvalidOperationError as e:
+            return json.loads(str(ErrorResponse(e)))
+        except InvalidResourceParameterError as e:
+            return json.loads(str(ErrorResponse(e)))
+        except DuplicateResourceCreationError as e:
+            return json.loads(str(ErrorResponse(e)))
 
 
 class ExerciseMetric(Resource):
@@ -306,7 +323,7 @@ class ExerciseMetric(Resource):
                 if data.get('dataType') is None:
                     raise InvalidResourceCreationError('dataType', 'ExerciseMetric')
                 new_id = db.exercise_metric.insert_one(data).inserted_id
-                return str(new_id)
+                return json.loads(str(Response(success=True, data=str(new_id))))
             except InvalidResourceCreationError as e:
                 return json.loads(str(ErrorResponse(e)))
 
@@ -351,7 +368,7 @@ class CategoryTag(Resource):
                 if data.get('name') is None:
                     raise InvalidResourceCreationError('name', 'CategoryTag')
                 new_id = db.category_type.insert_one(data).inserted_id
-                return str(new_id)
+                return json.loads(str(Response(success=True, data=str(new_id))))
 
             elif operation == 'update':
                 raise NotImplementedError
@@ -460,7 +477,7 @@ class Exercise(Resource):
                         raise InvalidResourceParameterError(muscle, "Muscle")
                 data['majorMuscles'] = muscle_ids_to_save
                 new_id = db.exercise.insert_one(data).inserted_id
-                return str(new_id)
+                return json.loads(str(Response(success=True, data=str(new_id))))
 
             elif operation == 'update':
                 raise NotImplementedError
