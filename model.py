@@ -1,23 +1,15 @@
-import os
 from flask import request
 from flask_restful import Resource
 from bson.objectid import ObjectId
 from bson.json_util import dumps
 import json
 import utils
-from pymongo import MongoClient, ALL
-from pymongo.collection import ReturnDocument
+from database import resource as db
+from authenticator import resource_auth
 
 import logging
 
 LOGGER = logging.getLogger()
-
-client = MongoClient(os.environ['DB_PORT_27017_TCP_ADDR'], 27017)
-db = client.dev
-
-
-def initialize():
-    db.set_profiling_level(level=ALL)
 
 
 class InvalidResourceCreationError(Exception):
@@ -129,6 +121,7 @@ class Equipment(Resource):
             return result
         return utils.bson_to_json(json.loads(dumps(result)))
 
+    @resource_auth.login_required
     def post(self):
         args = request.get_json()
         operation = args['operation']
@@ -221,6 +214,7 @@ class Muscle(Resource):
             return result
         return utils.bson_to_json(json.loads(dumps(result)))
 
+    @resource_auth.login_required
     def post(self):
         args = request.get_json()
         operation = args['operation']
@@ -275,6 +269,7 @@ class MuscleGroup(Resource):
             return result
         return utils.bson_to_json(json.loads(dumps(result)))
 
+    @resource_auth.login_required
     def post(self):
         args = request.get_json()
         operation = args['operation']
@@ -446,6 +441,8 @@ class CategoryTag(Resource):
 
 
 class Exercise(Resource):
+
+    @resource_auth.login_required
     def post(self):
         try:
             args = request.get_json()
