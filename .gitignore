@@ -149,3 +149,5 @@ crashlytics-build.properties
 fabric.properties
 
 .idea
+/static/
+/template/
