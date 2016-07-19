@@ -2,8 +2,6 @@ app:
   build: .
   ports:
     - "3000:2001"
-  volumes:
-    - .:/tnt-backend
   links:
     - db
 db:

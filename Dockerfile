@@ -10,9 +10,8 @@ ADD . /tnt-backend
 # Set the default directory where CMD will execute
 WORKDIR /tnt-backend
 
-
 RUN virtualenv dev/bin/acticate
 
-RUN pip install -r dev-req.txt
+RUN pip install -r requirements.txt
 
 CMD python app.py
