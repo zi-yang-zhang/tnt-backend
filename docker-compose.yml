@@ -1,8 +1,24 @@
-app:
-  build: .
+ngnix:
+  restart: always
+  build: ./ngnix
+  volumes:
+    - /var/www/tnt-backend/app/static
+  volumes_from:
+    - app
+  links:
+    - app
   ports:
-    - "3000:2001"
+    - "80:80"
+
+app:
+  restart: always
+  build: ./app
+  ports:
+    - "8080"
   links:
     - db
+  volumes:
+    - /var/www/tnt-backend/app/static
+
 db:
   image: mongo:3.3.8
