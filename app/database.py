@@ -1,9 +1,8 @@
 import os
 from pymongo import MongoClient, ALL
-from core import app
 
-mongo_host = os.environ['DB_PORT_27017_TCP_ADDR'] if app.debug else ""
-client = MongoClient(mongo_host, 27017)
+
+client = MongoClient(os.environ['MONGO_PORT_27017_TCP_ADDR'], 27017)
 resource = client.dev
 admin = client.admin
 
