@@ -2,9 +2,7 @@ ngnix:
   restart: always
   build: ./ngnix
   volumes:
-    - /var/www/tnt-backend/app/static
-  volumes_from:
-    - app
+    - ~/tnt-backend/app/static:/var/www/tnt-backend/app/static
   links:
     - app
   ports:
@@ -16,9 +14,16 @@ app:
   ports:
     - "8080"
   links:
-    - db
+    - mongo
   volumes:
-    - /var/www/tnt-backend/app/static
+    - ~/tnt-backend/app:/var/www/tnt-backend/app
 
-db:
+mongo:
   image: mongo:3.3.8
+
+
+data:
+  image: mongo:3.3.8
+  volumes:
+    - ~/data/mongo/tnt/main
+  command: --break-mongo
