@@ -9,7 +9,7 @@ application.register_blueprint(router_blueprint)
 
 application.config.from_pyfile('settings.py')
 try:
-    if application.config['DEBUG_SERVER']:
+    if application.config.get('DEBUG_SERVER'):
         CORS(app=application, supports_credentials=True, expose_headers='.*')
         if __name__ == '__main__':
             application.run(host="0.0.0.0", debug=True, port=2001, threaded=True)

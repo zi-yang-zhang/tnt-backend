@@ -19,9 +19,12 @@ app:
     - /home/ubuntu/tnt-backend/app:/var/www/tnt-backend/app
 
 mongo:
+  restart: always
   image: mongo:3.3.8
-  ports: 
+  ports:
     - "27017:27017"
+  volumesFrom:
+    -data
 
 
 data:
