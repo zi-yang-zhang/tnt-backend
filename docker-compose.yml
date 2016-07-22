@@ -23,12 +23,6 @@ mongo:
   image: mongo:3.3.8
   ports:
     - "27017:27017"
-  volumes_from:
-    - data
-
-
-data:
-  image: mongo:3.3.8
   volumes:
-    - /home/ubuntu/data/mongo/tnt/main
-  command: --break-mongo
+    - /home/ubuntu/mongo:/data/db
+
