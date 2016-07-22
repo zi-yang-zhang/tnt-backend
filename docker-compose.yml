@@ -16,7 +16,7 @@ app:
   links:
     - mongo
   volumes:
-    - .:/app
+    - ./app:/app
 
 mongo:
   restart: always
