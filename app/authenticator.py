@@ -22,7 +22,7 @@ def verify_token(token):
     credentials = base64.decodestring(token).split(':')
     user = db.user.find_one(filter={"username": credentials[0]})
     if user is None:
-        LOGGER.debug("user not found")
+        LOGGER.debug("user %s not found", credentials[0])
         return False
     return sha256_crypt.verify(credentials[1], user['hashed_password'])
 

@@ -2,6 +2,7 @@ from core import app as application
 from flask_cors import CORS
 from router import router_blueprint, router
 import sys
+import logging
 
 
 router.init_app(application)
@@ -21,4 +22,4 @@ try:
             application.run(host="0.0.0.0")
 except:
     e = sys.exc_info()[0]
-    application.logger.error(e)
+    logging.getLogger().error(e)

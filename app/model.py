@@ -60,7 +60,8 @@ class ErrorResponse(Response):
 
 
 class EquipmentType(Resource):
-
+    
+    @resource_auth.login_required
     def post(self):
         args = request.get_json()
         operation = args['operation']
@@ -99,12 +100,14 @@ class EquipmentType(Resource):
         except DuplicateResourceCreationError as e:
             return json.loads(str(ErrorResponse(e)))
 
+    @resource_auth.login_required
     def get(self, obj_id):
         result = db.equipment_type.find_one({"_id": ObjectId(obj_id)})
         if result is None:
             return result
         return utils.bson_to_json(result)
 
+    @resource_auth.login_required
     def delete(self, obj_id):
         result = db.equipment_type.delete_one({"_id": ObjectId(obj_id)})
         return result.raw_result
@@ -112,10 +115,12 @@ class EquipmentType(Resource):
 
 class Equipment(Resource):
 
+    @resource_auth.login_required
     def delete(self, obj_id):
         result = db.equipment.delete_one({"_id": ObjectId(obj_id)})
         return result.raw_result
 
+    @resource_auth.login_required
     def get(self, obj_id):
         result = db.equipment.find_one({"_id": ObjectId(obj_id)})
         if result is None:
@@ -127,7 +132,7 @@ class Equipment(Resource):
         args = request.get_json()
         operation = args['operation']
         data = args['data']
-        LOGGER.debug('request received %s', args)
+        LOGGER.debug('Equipment request received %s', args)
         try:
             if operation == 'create':
                 equipment_type = data.get('type')
@@ -205,10 +210,13 @@ class Equipment(Resource):
 
 
 class Muscle(Resource):
+
+    @resource_auth.login_required
     def delete(self, obj_id):
         result = db.muscle.delete_one({"_id": ObjectId(obj_id)})
         return result.raw_result
 
+    @resource_auth.login_required
     def get(self, obj_id):
         result = db.muscle.find_one({"_id": ObjectId(obj_id)})
         if result is None:
@@ -220,7 +228,7 @@ class Muscle(Resource):
         args = request.get_json()
         operation = args['operation']
         data = args['data']
-        LOGGER.debug('request received %s', args)
+        LOGGER.debug('Muscle request received %s', args)
         try:
             if operation == 'create':
                 if data.get('name') is None:
@@ -260,10 +268,13 @@ class Muscle(Resource):
 
 
 class MuscleGroup(Resource):
+
+    @resource_auth.login_required
     def delete(self, obj_id):
         result = db.muscle_group.delete_one({"_id": ObjectId(obj_id)})
         return result.raw_result
 
+    @resource_auth.login_required
     def get(self, obj_id):
         result = db.muscle_group.find_one({"_id": ObjectId(obj_id)})
         if result is None:
@@ -275,7 +286,7 @@ class MuscleGroup(Resource):
         args = request.get_json()
         operation = args['operation']
         data = args['data']
-        LOGGER.debug('request received %s', args)
+        LOGGER.debug('MuscleGroup request received %s', args)
         try:
             if operation == 'create':
                 if data.get('name') is None:
@@ -344,6 +355,7 @@ class MuscleGroup(Resource):
 
 class ExerciseMetric(Resource):
 
+    @resource_auth.login_required
     def post(self):
         args = request.get_json()
         operation = args['operation']
@@ -377,12 +389,14 @@ class ExerciseMetric(Resource):
                 results.append(utils.bson_to_json(result))
             return json.loads(str(Response(success=True, data=results)))
 
+    @resource_auth.login_required
     def get(self, obj_id):
         result = db.exercise_metric.find_one({"_id": ObjectId(obj_id)})
         if result is None:
             return result
         return utils.bson_to_json(result)
 
+    @resource_auth.login_required
     def delete(self, obj_id):
         result = db.exercise_metric.delete_one({"_id": ObjectId(obj_id)})
         return result.raw_result
@@ -390,6 +404,7 @@ class ExerciseMetric(Resource):
 
 class CategoryTag(Resource):
 
+    @resource_auth.login_required
     def post(self):
         try:
             args = request.get_json()
@@ -429,13 +444,14 @@ class CategoryTag(Resource):
         except InvalidOperationError as e:
             return json.loads(str(ErrorResponse(e)))
 
-
+    @resource_auth.login_required
     def get(self, obj_id):
         result = db.category_type.find_one({"_id": ObjectId(obj_id)})
         if result is None:
             return result
         return utils.bson_to_json(result)
 
+    @resource_auth.login_required
     def delete(self, obj_id):
         result = db.category_type.delete_one({"_id": ObjectId(obj_id)})
         return result.raw_result
@@ -449,7 +465,7 @@ class Exercise(Resource):
             args = request.get_json()
             operation = args.get('operation')
             data = args.get('data')
-            LOGGER.debug('request received %s', args)
+            LOGGER.debug('Exercise request received %s', args)
 
             if operation is None:
                 raise InvalidRequestError('operation')
@@ -577,13 +593,14 @@ class Exercise(Resource):
         except DuplicateResourceCreationError as e:
             return json.loads(str(ErrorResponse(e)))
 
-
+    @resource_auth.login_required
     def get(self, obj_id):
         result = db.exercise.find_one({"_id": ObjectId(obj_id)})
         if result is None:
             return result
         return utils.bson_to_json(result)
 
+    @resource_auth.login_required
     def delete(self, obj_id):
         result = db.exercise.delete_one({"_id": ObjectId(obj_id)})
         return result.raw_result

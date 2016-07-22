@@ -3,12 +3,11 @@ import logging
 from logging.config import fileConfig
 from jose import jwt, JWTError
 
-
-logging.getLogger('flask_cors').level = logging.DEBUG
-fileConfig('logging_config.ini')
-logger = logging.getLogger()
 app = Flask(__name__, static_folder='./static')
 app.config['SECRET_KEY'] = 'dev key'
+logging.getLogger('flask_cors').level = logging.DEBUG if app.debug else logging.INFO
+fileConfig('logging_config.ini')
+logger = logging.getLogger()
 
 
 @app.route('/')
@@ -29,7 +28,7 @@ def index():
 @app.route('/dashboard')
 def dashboard():
     access_token = request.cookies.get('jwt')
-    logger.debug(access_token)
+    logger.debug("access_token %s", access_token)
     if access_token is None:
         return make_response(redirect('/'))
     return send_from_directory('template', 'app.html')
