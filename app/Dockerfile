@@ -6,9 +6,9 @@ MAINTAINER Maintainer robert
 EXPOSE 80
 
 ## Copy the application folder inside the container
-ADD .  /var/www/tnt-backend/app
+ADD .  /app
 # Set the default directory where CMD will execute
-WORKDIR  /var/www/tnt-backend/app
+WORKDIR  /app
 
 RUN pip install -r requirements.txt
 
