@@ -60,7 +60,7 @@ class ErrorResponse(Response):
 
 
 class EquipmentType(Resource):
-    
+
     @resource_auth.login_required
     def post(self):
         args = request.get_json()

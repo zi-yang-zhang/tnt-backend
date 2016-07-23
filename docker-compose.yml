@@ -17,6 +17,8 @@ app:
     - mongo
   volumes:
     - ./app:/app
+  dockerfile: Dockerfile
+
 
 mongo:
   restart: always

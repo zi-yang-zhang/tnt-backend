@@ -8,6 +8,7 @@ import logging
 from core import app
 from calendar import timegm
 from datetime import datetime
+from flask import request, make_response
 
 
 LOGGER = logging.getLogger()
@@ -30,7 +31,8 @@ def verify_token(token):
 @resource_auth.verify_token
 def verify_token(token):
     try:
-        jwt.decode(token=token, key=app.secret_key, algorithms='HS256')
+        claim = jwt.decode(token=token, key=app.secret_key, algorithms='HS256')
+        LOGGER.info('Request received from %s', claim.get('user'))
     except JWTError as e:
         LOGGER.debug("%s, jwt not verified", str(e))
         return False
@@ -39,6 +41,9 @@ def verify_token(token):
 
 class AuthToken(Resource):
     @admin_auth.login_required
-    def get(self):
+    def post(self):
+        args = request.get_json()
+        if args.get('username') is None:
+            return make_response('username missing in payload', 400)
         issued_time = timegm(datetime.utcnow().utctimetuple())
-        return jwt.encode(claims={'exp': issued_time + SESSION_TIMEOUT, 'iat': issued_time}, key=app.secret_key, algorithm='HS256')
+        return jwt.encode(claims={'exp': issued_time + SESSION_TIMEOUT, 'iat': issued_time, 'user': args.get('username')}, key=app.secret_key, algorithm='HS256')

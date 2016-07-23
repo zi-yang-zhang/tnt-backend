@@ -1,0 +1,17 @@
+app:
+  restart: always
+  build: ./app
+  ports:
+    - "3000:2001"
+  links:
+    - mongo
+  volumes:
+    - ./app:/app
+  dockerfile: Dockerfile-dev
+
+mongo:
+  restart: always
+  image: mongo:3.3.8
+  ports:
+    - "27017:27017"
+

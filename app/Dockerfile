@@ -10,6 +10,8 @@ ADD .  /app
 # Set the default directory where CMD will execute
 WORKDIR  /app
 
+ENV setting="settings.py"
+
 RUN pip install -r requirements.txt
 
 CMD uwsgi --ini uwsgi-config.ini
