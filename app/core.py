@@ -4,7 +4,6 @@ from logging.config import fileConfig
 from jose import jwt, JWTError
 
 app = Flask(__name__, static_folder='./static')
-app.config['SECRET_KEY'] = 'dev key'
 logging.getLogger('flask_cors').level = logging.DEBUG if app.debug else logging.INFO
 fileConfig('logging_config.ini')
 logger = logging.getLogger()
