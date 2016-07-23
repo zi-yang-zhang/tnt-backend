@@ -28,9 +28,15 @@ def index():
 def dashboard():
     access_token = request.cookies.get('jwt')
     logger.debug("access_token %s", access_token)
-    if access_token is None:
+    if access_token is not None:
+        try:
+            logger.debug(jwt.decode(token=access_token, key=app.secret_key, algorithms='HS256'))
+            return send_from_directory('template', 'app.html')
+        except JWTError as e:
+            logger.debug("%s, jwt not verified", str(e))
+            return make_response(redirect('/'))
+    else:
         return make_response(redirect('/'))
-    return send_from_directory('template', 'app.html')
 
 
 @app.after_request
