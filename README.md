@@ -35,13 +35,9 @@ To view DB in docker container, use `docker exec -it tntbackend_db_1 bash`
     }
         
 #### `query`
- "data": criteria and conditions based on resources
- 
- criteria consists of the following structure(mongodb query style):
- 
-    "fieldName":{"qualifier":"criteria"}
- 
- Equipment: name or type
+ "data": criteria and count
+ The qualifier is limited to `equals` and `contains`
+ `find: 0` means find all entries that qualifies
  
  eg.
     
@@ -53,15 +49,57 @@ To view DB in docker container, use `docker exec -it tntbackend_db_1 bash`
 
 #### `update`
  "data": object of the resource to be updated
+ "_id" must be set, otherwise will fail to update
  eg.
  
     "data":{
+            "_id":"id"
             "name":"equipment 1",
             "imageURLs":"",
             "type":{
                 "name":"equipment type 1"
             }
     }
+
+
+## Response Structure
+
+    {
+        "success": true,
+        "data":{
+        },
+        "exceptionMessage":""
+    
+    }
+
+
+
+### Error response types
+
+    class InvalidResourceCreationError(Exception):
+        def __init__(self, param, resource_type):
+            self.message = param + " is required for creating " + resource_type
+    
+    
+    class InvalidResourceParameterError(Exception):
+        def __init__(self, param, resource_type):
+            self.message = param + " cannot be found in " + resource_type
+    
+    
+    class InvalidOperationError(Exception):
+        def __init__(self, param):
+            self.message = "Operation " + param + " is not supported"
+    
+    
+    class InvalidRequestError(Exception):
+        def __init__(self, param):
+            self.message = param + " is required for the request"
+    
+    
+    class DuplicateResourceCreationError(Exception):
+        def __init__(self, name, resource_type):
+            self.message = "Resource exists with name <" + name + "> for " + resource_type
+
 
 ## To start
 
