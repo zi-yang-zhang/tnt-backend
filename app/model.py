@@ -123,7 +123,7 @@ class Equipment(Resource):
     @resource_auth.login_required
     def delete(self, obj_id):
         result = db.equipment.delete_one({"_id": ObjectId(obj_id)})
-        return result.raw_result
+        return json.loads(str(Response(success=True))) if result.deleted_count > 0 else json.loads(str(Response(success=False)))
 
     @resource_auth.login_required
     def get(self, obj_id):
@@ -203,7 +203,7 @@ class Muscle(Resource):
     @resource_auth.login_required
     def delete(self, obj_id):
         result = db.muscle.delete_one({"_id": ObjectId(obj_id)})
-        return result.raw_result
+        return json.loads(str(Response(success=True))) if result.deleted_count > 0 else json.loads(str(Response(success=False)))
 
     @resource_auth.login_required
     def get(self, obj_id):
@@ -259,7 +259,7 @@ class MuscleGroup(Resource):
     @resource_auth.login_required
     def delete(self, obj_id):
         result = db.muscle_group.delete_one({"_id": ObjectId(obj_id)})
-        return result.raw_result
+        return json.loads(str(Response(success=True))) if result.deleted_count > 0 else json.loads(str(Response(success=False)))
 
     @resource_auth.login_required
     def get(self, obj_id):
@@ -509,7 +509,7 @@ class Exercise(Resource):
     @resource_auth.login_required
     def delete(self, obj_id):
         result = db.exercise.delete_one({"_id": ObjectId(obj_id)})
-        return result.raw_result
+        return json.loads(str(Response(success=True))) if result.deleted_count > 0 else json.loads(str(Response(success=False)))
 
 
 def get_muscles_for_result(raw_result, param_name):
