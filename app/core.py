@@ -24,8 +24,9 @@ def index():
         return send_from_directory('template', 'login.html')
 
 
-@app.route('/dashboard')
-def dashboard():
+@app.route('/dashboard', defaults={'path': ''})
+@app.route('/dashboard/<path:path>')
+def dashboard(path):
     access_token = request.cookies.get('jwt')
     logger.debug("access_token %s", access_token)
     if access_token is not None:
