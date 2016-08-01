@@ -527,7 +527,7 @@ def get_equipments_for_result(raw_result, param_name):
 
 
 def validate_exercise_entry_data(data):
-    if data.get('name') is None:
+    if data.get('name') is None or data.get('name') == "":
         raise InvalidResourceCreationError('name', 'Exercise')
     if data.get('majorMuscles') is None or data.get('majorMuscles').__len__ == 0:
         raise InvalidResourceCreationError('majorMuscle', 'Exercise')
@@ -602,7 +602,7 @@ def validate_exercise_entry_data(data):
 
 
 def validate_muscle_group_entry_data(data):
-    if data.get('name') is None:
+    if data.get('name') is None or data.get('name') == "":
         raise InvalidResourceCreationError('name', 'MuscleGroup')
     if data.get('muscles') is None or data.get('muscles').__len__() < 1:
         raise InvalidResourceCreationError('muscles', 'MuscleGroup')
@@ -625,7 +625,7 @@ def validate_muscle_group_entry_data(data):
 
 
 def validate_muscle_entry_data(data):
-    if data.get('name') is None:
+    if data.get('name') is None or data.get('name') == "":
         raise InvalidResourceCreationError('name', 'Muscle')
     if data.get('imageURLs') is None:
         data.update({'imageURLs': []})
@@ -636,9 +636,9 @@ def validate_muscle_entry_data(data):
 
 
 def validate_equipment_entry_data(data):
-    if data.get('name') is None:
+    if data.get('name') is None or data.get('name') == "":
         raise InvalidResourceCreationError('name', 'Equipment')
-    if data.get('type') is None:
+    if data.get('type') is None or data.get('name') == "":
         raise InvalidResourceCreationError('equipment_type', 'Equipment')
     if data.get('detail') is None:
         data.update({"detail": ""})
