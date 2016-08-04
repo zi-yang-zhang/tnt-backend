@@ -43,6 +43,11 @@ class InvalidIdUpdateRequestError(Exception):
         self.message = name + " with " + _id + " not found" if _id is not None else "id missing in request"
 
 
+class AttemptedToDeleteInUsedResource(Exception):
+    def __init__(self, name, resources):
+        self.message = "Attempted to delete " + name + ", used by " + str(resources)
+
+
 class Response(object):
     def __init__(self, success, data=None):
         if data is None:
@@ -122,8 +127,20 @@ class Equipment(Resource):
 
     @resource_auth.login_required
     def delete(self, obj_id):
-        result = db.equipment.delete_one({"_id": ObjectId(obj_id)})
-        return json.loads(str(Response(success=True))) if result.deleted_count > 0 else json.loads(str(Response(success=False)))
+        in_use_query_exercise = {"equipments": {'$elemMatch': {'$eq': ObjectId(obj_id)}}}
+        in_use_query_exercise_result = db.exercise.find(in_use_query_exercise, projection={"name": 1, "_id": 0})
+        if in_use_query_exercise_result is None:
+            result = db.equipment.delete_one({"_id": ObjectId(obj_id)})
+            return json.loads(str(Response(success=True))) if result.deleted_count > 0 else json.loads(
+                str(Response(success=False)))
+        else:
+            result_name_list = []
+            if in_use_query_exercise_result is not None:
+                for result in in_use_query_exercise_result:
+                    result_name_list.append(result.get('name'))
+            target_to_be_deleted = db.equipment.find_one({'_id': ObjectId(obj_id)}, projection={"name": 1, "_id": 0})
+            return json.loads(
+                str(ErrorResponse(AttemptedToDeleteInUsedResource(target_to_be_deleted.get('name'), result_name_list))))
 
     @resource_auth.login_required
     def get(self, obj_id):
@@ -145,7 +162,11 @@ class Equipment(Resource):
             elif operation == 'update':
                 if data.get('_id') is None:
                     raise InvalidIdUpdateRequestError('Equipment', data.get('_id'))
-                result = db.equipment.update_one({"_id": ObjectId(data.get('_id'))}, validate_equipment_entry_data(data))
+                update_query = validate_equipment_entry_data(data, False)
+                id_to_update = data.get('_id')
+                del update_query['_id']
+                update_query = {'$set': update_query}
+                result = db.equipment.update_one({"_id": ObjectId(id_to_update)}, update_query)
                 if result.matched_count == 0:
                     raise InvalidIdUpdateRequestError('Equipment', data.get('_id'))
                 return json.loads(str(Response(success=True, data=str(result.upserted_id))))
@@ -196,14 +217,34 @@ class Equipment(Resource):
             return json.loads(str(ErrorResponse(e)))
         except DuplicateResourceCreationError as e:
             return json.loads(str(ErrorResponse(e)))
+        except InvalidIdUpdateRequestError as e:
+            return json.loads(str(ErrorResponse(e)))
 
 
 class Muscle(Resource):
 
     @resource_auth.login_required
     def delete(self, obj_id):
-        result = db.muscle.delete_one({"_id": ObjectId(obj_id)})
-        return json.loads(str(Response(success=True))) if result.deleted_count > 0 else json.loads(str(Response(success=False)))
+        in_use_query_muscle_group = {"muscles": {'$elemMatch': {'$eq': ObjectId(obj_id)}}}
+        in_use_query_exercise = {'$or': [{"majorMuscles": {'$elemMatch': {'$eq': ObjectId(obj_id)}}}, {"minorMuscles": {'$elemMatch': {'$eq': ObjectId(obj_id)}}}]}
+
+        in_use_query_muscle_group_result = db.muscle_group.find(in_use_query_muscle_group, projection={"name": 1, "_id": 0})
+        in_use_query_exercise_result = db.exercise.find(in_use_query_exercise, projection={"name": 1, "_id": 0})
+
+        if in_use_query_exercise_result is None and in_use_query_muscle_group_result is None:
+            result = db.muscle.delete_one({"_id": ObjectId(obj_id)})
+            return json.loads(str(Response(success=True))) if result.deleted_count > 0 else json.loads(str(Response(success=False)))
+        else:
+            result_name_list = []
+            if in_use_query_muscle_group_result is not None:
+                for result in in_use_query_muscle_group_result:
+                    result_name_list.append(result.get('name'))
+
+            if in_use_query_exercise_result is not None:
+                for result in in_use_query_exercise_result:
+                    result_name_list.append(result.get('name'))
+            target_to_be_deleted = db.muscle.find_one({'_id': ObjectId(obj_id)}, projection={"name": 1, "_id": 0})
+            return json.loads(str(ErrorResponse(AttemptedToDeleteInUsedResource(target_to_be_deleted.get('name'), result_name_list))))
 
     @resource_auth.login_required
     def get(self, obj_id):
@@ -225,7 +266,11 @@ class Muscle(Resource):
             elif operation == 'update':
                 if data.get('_id') is None:
                     raise InvalidIdUpdateRequestError('Muscle', data.get('_id'))
-                result = db.muscle.update_one({"_id": ObjectId(data.get('_id'))}, validate_muscle_entry_data(data))
+                update_query = validate_muscle_entry_data(data, False)
+                id_to_update = data.get('_id')
+                del update_query['_id']
+                update_query = {'$set': update_query}
+                result = db.muscle.update_one({"_id": ObjectId(id_to_update)}, update_query)
                 if result.matched_count == 0:
                     raise InvalidIdUpdateRequestError('Muscle', data.get('_id'))
                 return json.loads(str(Response(success=True, data=str(result.upserted_id))))
@@ -251,6 +296,8 @@ class Muscle(Resource):
         except InvalidResourceParameterError as e:
             return json.loads(str(ErrorResponse(e)))
         except DuplicateResourceCreationError as e:
+            return json.loads(str(ErrorResponse(e)))
+        except InvalidIdUpdateRequestError as e:
             return json.loads(str(ErrorResponse(e)))
 
 
@@ -281,7 +328,11 @@ class MuscleGroup(Resource):
             elif operation == 'update':
                 if data.get('_id') is None:
                     raise InvalidIdUpdateRequestError('MuscleGroup', data.get('_id'))
-                result = db.muscle_group.update_one({"_id": ObjectId(data.get('_id'))}, validate_muscle_group_entry_data(data))
+                update_query = validate_muscle_group_entry_data(data, False)
+                id_to_update = data.get('_id')
+                del update_query['_id']
+                update_query = {'$set': update_query}
+                result = db.muscle_group.update_one({"_id": ObjectId(id_to_update)}, update_query)
                 if result.matched_count == 0:
                     raise InvalidIdUpdateRequestError('MuscleGroup', data.get('_id'))
                 return json.loads(str(Response(success=True, data=str(result.upserted_id))))
@@ -323,6 +374,8 @@ class MuscleGroup(Resource):
         except InvalidResourceParameterError as e:
             return json.loads(str(ErrorResponse(e)))
         except DuplicateResourceCreationError as e:
+            return json.loads(str(ErrorResponse(e)))
+        except InvalidIdUpdateRequestError as e:
             return json.loads(str(ErrorResponse(e)))
 
 
@@ -450,7 +503,11 @@ class Exercise(Resource):
             elif operation == 'update':
                 if data.get('_id') is None:
                     raise InvalidIdUpdateRequestError('Exercise', data.get('_id'))
-                result = db.exercise.update_one({"_id": ObjectId(data.get('_id'))}, validate_exercise_entry_data(data))
+                update_query = validate_exercise_entry_data(data, False)
+                id_to_update = data.get('_id')
+                del update_query['_id']
+                update_query = {'$set': update_query}
+                result = db.exercise.update_one({"_id": ObjectId(id_to_update)}, update_query)
                 if result.matched_count == 0:
                     raise InvalidIdUpdateRequestError('Exercise', data.get('_id'))
                 return json.loads(str(Response(success=True, data=str(result.upserted_id))))
@@ -498,6 +555,8 @@ class Exercise(Resource):
             return json.loads(str(ErrorResponse(e)))
         except DuplicateResourceCreationError as e:
             return json.loads(str(ErrorResponse(e)))
+        except InvalidIdUpdateRequestError as e:
+            return json.loads(str(ErrorResponse(e)))
 
     @resource_auth.login_required
     def get(self, obj_id):
@@ -526,7 +585,7 @@ def get_equipments_for_result(raw_result, param_name):
     return equipments
 
 
-def validate_exercise_entry_data(data):
+def validate_exercise_entry_data(data, filter_name=True):
     if data.get('name') is None or data.get('name') == "":
         raise InvalidResourceCreationError('name', 'Exercise')
     if data.get('majorMuscles') is None or data.get('majorMuscles').__len__ == 0:
@@ -584,10 +643,10 @@ def validate_exercise_entry_data(data):
         data.update({'advancedContent': ""})
     if data.get('basicContent') is None:
         data.update({'basicContent': ""})
-
-    duplicate_check_query = db.exercise.find_one(filter={"name": data.get('name')})
-    if duplicate_check_query is not None:
-        raise DuplicateResourceCreationError(data.get('name'), 'Exercise')
+    if filter_name:
+        duplicate_check_query = db.exercise.find_one(filter={"name": data.get('name')})
+        if duplicate_check_query is not None:
+            raise DuplicateResourceCreationError(data.get('name'), 'Exercise')
 
     muscles = data['majorMuscles']
     muscle_ids_to_save = []
@@ -601,16 +660,17 @@ def validate_exercise_entry_data(data):
     return data
 
 
-def validate_muscle_group_entry_data(data):
+def validate_muscle_group_entry_data(data, filter_name=True):
     if data.get('name') is None or data.get('name') == "":
         raise InvalidResourceCreationError('name', 'MuscleGroup')
     if data.get('muscles') is None or data.get('muscles').__len__() < 1:
         raise InvalidResourceCreationError('muscles', 'MuscleGroup')
     if data.get('imageURLs') is None:
         data.update({'imageURLs': []})
-    duplicate_check_query = db.muscle_group.find_one(filter={"name": data.get('name')})
-    if duplicate_check_query is not None:
-        raise DuplicateResourceCreationError(data.get('name'), 'MuscleGroup')
+    if filter_name:
+        duplicate_check_query = db.muscle_group.find_one(filter={"name": data.get('name')})
+        if duplicate_check_query is not None:
+            raise DuplicateResourceCreationError(data.get('name'), 'MuscleGroup')
     muscles = data['muscles']
     muscle_ids_to_save = []
     for muscle in muscles:
@@ -624,18 +684,19 @@ def validate_muscle_group_entry_data(data):
     return data
 
 
-def validate_muscle_entry_data(data):
+def validate_muscle_entry_data(data, filter_name=True):
     if data.get('name') is None or data.get('name') == "":
         raise InvalidResourceCreationError('name', 'Muscle')
     if data.get('imageURLs') is None:
         data.update({'imageURLs': []})
-    duplicate_check_query = db.muscle.find_one(filter={"name": data.get('name')})
-    if duplicate_check_query is not None:
-        raise DuplicateResourceCreationError(data.get('name'), 'Muscle')
+    if filter_name:
+        duplicate_check_query = db.muscle.find_one(filter={"name": data.get('name')})
+        if duplicate_check_query is not None:
+            raise DuplicateResourceCreationError(data.get('name'), 'Muscle')
     return data
 
 
-def validate_equipment_entry_data(data):
+def validate_equipment_entry_data(data, filter_name=True):
     if data.get('name') is None or data.get('name') == "":
         raise InvalidResourceCreationError('name', 'Equipment')
     if data.get('type') is None or data.get('name') == "":
@@ -644,9 +705,10 @@ def validate_equipment_entry_data(data):
         data.update({"detail": ""})
     if data.get('imageURLs') is None:
         data.update({"imageURLs": []})
-    duplicate_check_query = db.equipment.find_one(filter={"name": data.get('name')})
-    if duplicate_check_query is not None:
-        raise DuplicateResourceCreationError(data.get('name'), 'Equipment')
+    if filter_name:
+        duplicate_check_query = db.equipment.find_one(filter={"name": data.get('name')})
+        if duplicate_check_query is not None:
+            raise DuplicateResourceCreationError(data.get('name'), 'Equipment')
     type_result = db.equipment_type.find_one({"name": data.get('type')})
     if type_result is not None:
         data['type'] = type_result['_id']

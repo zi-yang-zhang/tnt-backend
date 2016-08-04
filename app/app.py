@@ -11,7 +11,6 @@ application.register_blueprint(router_blueprint)
 
 application.config.from_pyfile(os.environ['setting'])
 try:
-    logging.getLogger().debug(application.config.get('DEBUG_SERVER'))
     if application.config.get('DEBUG_SERVER'):
         CORS(app=application, supports_credentials=True, expose_headers='.*')
         if __name__ == '__main__':
