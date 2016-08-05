@@ -129,15 +129,14 @@ class Equipment(Resource):
     def delete(self, obj_id):
         in_use_query_exercise = {"equipments": {'$elemMatch': {'$eq': ObjectId(obj_id)}}}
         in_use_query_exercise_result = db.exercise.find(in_use_query_exercise, projection={"name": 1, "_id": 0})
-        if in_use_query_exercise_result is None:
+        if in_use_query_exercise_result.count() == 0:
             result = db.equipment.delete_one({"_id": ObjectId(obj_id)})
             return json.loads(str(Response(success=True))) if result.deleted_count > 0 else json.loads(
                 str(Response(success=False)))
         else:
             result_name_list = []
-            if in_use_query_exercise_result is not None:
-                for result in in_use_query_exercise_result:
-                    result_name_list.append(result.get('name'))
+            for result in in_use_query_exercise_result:
+                result_name_list.append(result.get('name'))
             target_to_be_deleted = db.equipment.find_one({'_id': ObjectId(obj_id)}, projection={"name": 1, "_id": 0})
             return json.loads(
                 str(ErrorResponse(AttemptedToDeleteInUsedResource(target_to_be_deleted.get('name'), result_name_list))))
@@ -231,16 +230,16 @@ class Muscle(Resource):
         in_use_query_muscle_group_result = db.muscle_group.find(in_use_query_muscle_group, projection={"name": 1, "_id": 0})
         in_use_query_exercise_result = db.exercise.find(in_use_query_exercise, projection={"name": 1, "_id": 0})
 
-        if in_use_query_exercise_result is None and in_use_query_muscle_group_result is None:
+        if in_use_query_muscle_group_result.count() == 0 and in_use_query_exercise_result.count() == 0:
             result = db.muscle.delete_one({"_id": ObjectId(obj_id)})
             return json.loads(str(Response(success=True))) if result.deleted_count > 0 else json.loads(str(Response(success=False)))
         else:
             result_name_list = []
-            if in_use_query_muscle_group_result is not None:
+            if in_use_query_muscle_group_result.count() > 0:
                 for result in in_use_query_muscle_group_result:
                     result_name_list.append(result.get('name'))
 
-            if in_use_query_exercise_result is not None:
+            if in_use_query_exercise_result.count() > 0:
                 for result in in_use_query_exercise_result:
                     result_name_list.append(result.get('name'))
             target_to_be_deleted = db.muscle.find_one({'_id': ObjectId(obj_id)}, projection={"name": 1, "_id": 0})
