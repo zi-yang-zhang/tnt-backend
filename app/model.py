@@ -1,3 +1,4 @@
+# coding=utf-8
 import json
 import logging
 
@@ -35,7 +36,8 @@ class InvalidRequestError(Exception):
 
 class DuplicateResourceCreationError(Exception):
     def __init__(self, name, resource_type):
-        self.message = "Resource exists with name <" + name + "> for " + resource_type
+        # self.message = "Resource exists with name <" + name + "> for " + resource_type
+        self.message = "资源 <".decode("utf-8") + name + "> 已经存在.".decode("utf-8")
 
 
 class InvalidIdUpdateRequestError(Exception):
@@ -45,7 +47,8 @@ class InvalidIdUpdateRequestError(Exception):
 
 class AttemptedToDeleteInUsedResource(Exception):
     def __init__(self, name, resources):
-        self.message = "Attempted to delete " + name + ", used by " + str(resources)
+        # self.message = "Attempted to delete " + name + ", used by " + str(resources)
+        self.message = "尝试删除 ".decode("utf-8") + name + ", 使用于 ".decode("utf-8") + str(resources) + "。 请先删除或修改使用的资源。".decode("utf-8")
 
 
 class Response(object):
