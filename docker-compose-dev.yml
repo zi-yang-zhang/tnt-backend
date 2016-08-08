@@ -7,6 +7,7 @@ app:
     - mongo
   volumes:
     - ./app:/app
+    - ../log:/tmp/log
   dockerfile: Dockerfile-dev
 
 mongo:
