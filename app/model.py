@@ -156,7 +156,7 @@ class Equipment(Resource):
         args = request.get_json()
         operation = args['operation']
         data = args['data']
-        LOGGER.debug('Equipment request received %s', args)
+        LOGGER.info('Equipment request received %s', args)
         try:
             if operation == 'create':
                 new_id = db.equipment.insert_one(validate_equipment_entry_data(data)).inserted_id
@@ -207,7 +207,7 @@ class Equipment(Resource):
                     del result['type']
                     result.update({'type': utils.bson_to_json(equipment_type)})
                     results.append(result)
-                LOGGER.debug('response sent %s', str(Response(success=True, data=results)))
+                LOGGER.info('response sent %s', str(Response(success=True, data=results)))
                 return json.loads(str(Response(success=True, data=results)))
         except InvalidRequestError as e:
             return json.loads(str(ErrorResponse(e)))
@@ -260,7 +260,7 @@ class Muscle(Resource):
         args = request.get_json()
         operation = args['operation']
         data = args['data']
-        LOGGER.debug('Muscle request received %s', args)
+        LOGGER.info('Muscle request received %s', args)
         try:
             if operation == 'create':
                 new_id = db.muscle.insert_one(validate_muscle_entry_data(data)).inserted_id
@@ -287,7 +287,7 @@ class Muscle(Resource):
                 results = []
                 for result in db.muscle.find(filter=criteria, limit=limit):
                     results.append(utils.bson_to_json(result))
-                LOGGER.debug('response sent %s', str(Response(success=True, data=results)))
+                LOGGER.info('response sent %s', str(Response(success=True, data=results)))
                 return json.loads(str(Response(success=True, data=results)))
         except InvalidRequestError as e:
             return json.loads(str(ErrorResponse(e)))
@@ -322,7 +322,7 @@ class MuscleGroup(Resource):
         args = request.get_json()
         operation = args['operation']
         data = args['data']
-        LOGGER.debug('MuscleGroup request received %s', args)
+        LOGGER.info('MuscleGroup request received %s', args)
         try:
             if operation == 'create':
                 new_id = db.muscle_group.insert_one(validate_muscle_group_entry_data(data)).inserted_id
@@ -365,7 +365,7 @@ class MuscleGroup(Resource):
                     del result['muscles']
                     result.update({'muscles': muscles})
                     results.append(result)
-                LOGGER.debug('response sent %s', str(Response(success=True, data=results)))
+                LOGGER.info('response sent %s', str(Response(success=True, data=results)))
                 return json.loads(str(Response(success=True, data=results)))
         except InvalidRequestError as e:
             return json.loads(str(ErrorResponse(e)))
@@ -493,7 +493,7 @@ class Exercise(Resource):
             args = request.get_json()
             operation = args.get('operation')
             data = args.get('data')
-            LOGGER.debug('Exercise request received %s', args)
+            LOGGER.info('Exercise request received %s', args)
 
             if operation is None:
                 raise InvalidRequestError('operation')
@@ -542,7 +542,7 @@ class Exercise(Resource):
                         del result["majorMuscles"]
                         result.update({"majorMuscles": major_muscles})
                         results.append(result)
-                    LOGGER.debug('response sent %s', str(Response(success=True, data=results)))
+                    LOGGER.info('response sent %s', str(Response(success=True, data=results)))
                 return json.loads(str(Response(success=True, data=results)))
             else:
                 raise InvalidOperationError(operation)

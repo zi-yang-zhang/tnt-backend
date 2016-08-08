@@ -1,15 +1,10 @@
-from core import app as application
-from flask_cors import CORS
-from router import router_blueprint, router
-import sys
 import logging
-import os
+import sys
 
+from flask_cors import CORS
 
-router.init_app(application)
-application.register_blueprint(router_blueprint)
+from core import app as application
 
-application.config.from_pyfile(os.environ['setting'])
 try:
     if application.config.get('DEBUG_SERVER'):
         CORS(app=application, supports_credentials=True, expose_headers='.*')

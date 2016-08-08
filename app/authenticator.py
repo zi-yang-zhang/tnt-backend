@@ -5,13 +5,12 @@ from database import admin as db
 import base64
 from jose import jwt, JWTError
 import logging
-from core import app
 from calendar import timegm
 from datetime import datetime
-from flask import request, make_response
+from flask import request, make_response, current_app as app
 
 
-LOGGER = logging.getLogger()
+LOGGER = app.logger
 
 admin_auth = HTTPTokenAuth(scheme='tnt-admin-auth-scheme', realm='admin')
 resource_auth = HTTPTokenAuth(scheme='Bearer', realm='resource')
@@ -23,7 +22,7 @@ def verify_token(token):
     credentials = base64.decodestring(token).split(':')
     user = db.user.find_one(filter={"username": credentials[0]})
     if user is None:
-        LOGGER.debug("user %s not found", credentials[0])
+        LOGGER.error("user %s not found", credentials[0])
         return False
     return sha256_crypt.verify(credentials[1], user['hashed_password'])
 
@@ -34,7 +33,7 @@ def verify_token(token):
         claim = jwt.decode(token=token, key=app.secret_key, algorithms='HS256')
         LOGGER.info('Request received from %s', claim.get('user'))
     except JWTError as e:
-        LOGGER.debug("%s, jwt not verified", str(e))
+        LOGGER.error("%s, jwt not verified", str(e))
         return False
     return True
 
