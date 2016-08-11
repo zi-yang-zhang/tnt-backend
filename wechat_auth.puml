@@ -1,0 +1,18 @@
+@startuml
+actor user
+user --> app: login with wechat
+app --> wechatOauthSDK :request user consent for login
+wechatOauthSDK --> wechatOauthSDK:popup wechat oauth login
+user --> wechatOauthSDK: confirm login
+wechatOauthSDK --> app: get code
+app --> tntBackend:/api/wechat_auth({"type":"wechat","code":''})
+tntBackend --> wechatOauthBackend: get access_token
+wechatOauthBackend --> tntBackend: access_token, refresh_token, openid
+alt openid exists
+tntBackend --> db:update (refresh_token)
+tntBackend --> app:login success(jwt)
+else openid doesn't exist
+tntBackend --> db:new user, save (openid, refresh_token)
+tntBackend --> app:registration success(jwt)
+end
+@enduml

@@ -5,6 +5,112 @@ Some useful tips:
 
 To view DB in docker container, use `docker exec -it tntbackend_db_1 bash`
 
+## Authentication scheme:
+### Admin
+#### Request
+    scheme='tnt-admin-auth-scheme', realm='admin'
+    Auth header(base 64 encoded)
+    {
+        username:password
+    }
+    password is verified against sha256 encrypted string from database
+#### Response
+    jwt with claims={'exp': '', 'iat': '', 'user': ''}
+    expiry in a month.
+    
+### User (OAuth 2)
+
+**On app start**
+
+*Request*
+
+Get Public Key
+Request for Server public key
+
+    Get /api/gpk
+
+*Response*
+
+    {"publicKey":''}
+    
+    
+#### Wechat OAuth
+
+![alt auth diagram](wechat_auth.png)
+
+**Login**
+
+    /api/wechat_auth
+
+*Request*
+
+    public key encrypted
+    POST
+    {
+        "type":"wechat",
+        "code":''
+    }
+    
+#### Password based Authentication
+
+**Registration**
+
+    /api/register
+
+*Request*
+
+    public key encrypted
+    POST
+    {
+        "type":"password",
+        "username":'',
+        "password":'',
+        "clientPublicKey":'',
+        "deviceName":''
+    }
+    
+*Response*
+
+    {
+        "success":'',
+        "data":
+        {
+                "token_type":"bearer",
+                "access_token":"eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyIjoiVlx1MDAxNcKbwoNUwoonbFPCu8KhwrYiLCJpYXQiOjE0NDQyNjI1NDMsImV4cCI6MTQ0NDI2MjU2M30.MldruS1PvZaRZIJR4legQaauQ3_DYKxxP2rFnD37Ip4",
+                "refresh_token":"fdb8fdbecf1d03ce5e6125c067733c0d51de209c"
+        }
+    }
+    
+
+**Authentication**
+
+    /api/auth
+
+*Request*
+
+    GET
+    scheme='tnt-user-auth-scheme', realm='user'
+    public key encrypted in header
+    {
+        "type":"password",
+        "username":'',
+        "password":'',
+        "clientPublicKey":'',
+        "deviceName":''
+    }
+    
+    
+*Response*
+
+    {
+        "success":'',
+        "data":
+        {
+                "token_type":"bearer",
+                "access_token":"eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyIjoiVlx1MDAxNcKbwoNUwoonbFPCu8KhwrYiLCJpYXQiOjE0NDQyNjI1NDMsImV4cCI6MTQ0NDI2MjU2M30.MldruS1PvZaRZIJR4legQaauQ3_DYKxxP2rFnD37Ip4",
+                "refresh_token":"fdb8fdbecf1d03ce5e6125c067733c0d51de209c"
+        }
+    }
 
 ## Request structure:
 
