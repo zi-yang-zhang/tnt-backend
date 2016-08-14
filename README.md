@@ -47,7 +47,6 @@ Request for Server public key
     public key encrypted
     POST
     {
-        "type":"wechat",
         "code":''
     }
     
@@ -62,7 +61,6 @@ Request for Server public key
     public key encrypted
     POST
     {
-        "type":"password",
         "username":'',
         "password":'',
         "clientPublicKey":'',

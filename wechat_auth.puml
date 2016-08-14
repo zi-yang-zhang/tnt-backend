@@ -5,9 +5,9 @@ app --> wechatOauthSDK :request user consent for login
 wechatOauthSDK --> wechatOauthSDK:popup wechat oauth login
 user --> wechatOauthSDK: confirm login
 wechatOauthSDK --> app: get code
-app --> tntBackend:/api/wechat_auth({"type":"wechat","code":''})
-tntBackend --> wechatOauthBackend: get access_token
-wechatOauthBackend --> tntBackend: access_token, refresh_token, openid
+app --> wechatOauthBackend: get access_token(https://api.weixin.qq.com/sns/oauth2/access_token?appid=&secret=&code=&grant_type=authorization_code)
+wechatOauthBackend --> app: access_token, refresh_token, openid
+app --> tntBackend:/api/wechat_auth({"openid":''})
 alt openid exists
 tntBackend --> db:update (refresh_token)
 tntBackend --> app:login success(jwt)
