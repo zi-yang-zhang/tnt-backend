@@ -1,5 +1,5 @@
 import model
-from authenticator import AuthToken
+from authenticator import AdminAuthToken, WechatAuthToken
 from flask import Blueprint
 from flask_restful import Api
 
@@ -13,7 +13,8 @@ router.add_resource(model.MuscleGroup, '/api/muscle_group/<string:obj_id>', '/ap
 router.add_resource(model.ExerciseMetric, '/api/exercise_metric/<string:obj_id>', '/api/exercise_metric/')
 router.add_resource(model.CategoryTag, '/api/category_tag/<string:obj_id>', '/api/category_tag/')
 router.add_resource(model.Exercise, '/api/exercise/<string:obj_id>', '/api/exercise/')
-router.add_resource(AuthToken, '/api/auth/')
+router.add_resource(AdminAuthToken, '/api/auth/')
+router.add_resource(WechatAuthToken, '/api/wechat_auth')
 
 
 

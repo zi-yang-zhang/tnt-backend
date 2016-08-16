@@ -1,13 +1,16 @@
 import logging
 from logging.config import fileConfig
-
 from flask import send_from_directory, request, make_response, redirect
 from jose import jwt, JWTError
+import os
+from flask import Flask
+from router import router_blueprint, router
 
-from factory import create_app
-from tasks import debug_log
 
-app = create_app()
+app = Flask('tnt-core', static_folder='./static')
+app.config.from_pyfile(os.environ['setting'])
+router.init_app(app)
+app.register_blueprint(router_blueprint)
 logging.getLogger('flask_cors').level = logging.DEBUG if app.debug else logging.INFO
 fileConfig('logging_config.ini')
 logger = app.logger
@@ -16,14 +19,13 @@ logger = app.logger
 @app.route('/')
 def index():
     access_token = request.cookies.get('jwt')
-    debug_log.delay('hit')
     logger.info("access_token %s", access_token)
     if access_token is not None:
         try:
             jwt.decode(token=access_token, key=app.secret_key, algorithms='HS256')
             return make_response(redirect('/dashboard'))
         except JWTError as e:
-            logger.info("%s, jwt not verified", str(e))
+            logger.info("jwt not verified: %s", type(e).__name__)
             return send_from_directory('template', 'login.html')
     else:
         return send_from_directory('template', 'login.html')
@@ -40,7 +42,7 @@ def dashboard(path):
             jwt.decode(token=access_token, key=app.secret_key, algorithms='HS256')
             return send_from_directory('template', 'app.html')
         except JWTError as e:
-            logger.info("%s, jwt not verified", str(e))
+            logger.info("jwt not verified: %s", type(e).__name__)
             return make_response(redirect('/'))
     else:
         return make_response(redirect('/'))

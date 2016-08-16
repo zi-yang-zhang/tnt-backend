@@ -16,3 +16,4 @@ passlib==1.6.5
 python-jose
 flask_assets
 uwsgi
+requests==2.11.0
