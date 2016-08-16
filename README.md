@@ -5,6 +5,19 @@ Some useful tips:
 
 To view DB in docker container, use `docker exec -it tntbackend_db_1 bash`
 
+## User Restriction Level(Privilege is inclusive)
+*DBA*:**0**[Manage all DB(Restoration, Backup)]
+
+*SystemAdmin*:**1**[Manage all collection(Delete Collection, User data, Revoke User privilege, Access Admin user DB)]
+
+*Admin*:**2**[Manage Resource data(CRUD Resource data)]
+
+*PowerUser(Gym, coach)*:**3**[Access Resource Data(Create and Read Resource data)]
+
+*User*:**4**[Access Resource Data(Read Resource data)]
+
+*Guest*:**5**[Restricted Access Resource Data(Read Resource data)]
+
 ## Authentication scheme:
 ### Admin
 #### Request
