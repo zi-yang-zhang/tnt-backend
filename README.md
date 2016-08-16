@@ -28,7 +28,7 @@ To view DB in docker container, use `docker exec -it tntbackend_db_1 bash`
     }
     password is verified against sha256 encrypted string from database
 #### Response
-    jwt with claims={'exp': '', 'iat': '', 'user': ''}
+    jwt with claims={'exp': '', 'iat': '', 'user': '', 'level':''}
     expiry in a month.
     
 ### User (OAuth 2)
@@ -45,7 +45,10 @@ Request for Server public key
 *Response*
 
     {"publicKey":''}
-    
+*Response*
+
+    jwt with claims={'exp': '', 'iat': '', 'user': '', 'level':''}
+    expiry in a month.
     
 #### Wechat OAuth
 
@@ -60,7 +63,7 @@ Request for Server public key
     public key encrypted
     POST
     {
-        "code":''
+        "openid":''
     }
     
 #### Password based Authentication
@@ -167,6 +170,7 @@ Request for Server public key
 #### `update`
  "data": object of the resource to be updated
  "_id" must be set, otherwise will fail to update
+ 
  eg.
  
     "data":{
