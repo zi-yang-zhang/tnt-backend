@@ -45,10 +45,7 @@ Request for Server public key
 *Response*
 
     {"publicKey":''}
-*Response*
-
-    jwt with claims={'exp': '', 'iat': '', 'user': '', 'level':''}
-    expiry in a month.
+    
     
 #### Wechat OAuth
 

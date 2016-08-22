@@ -1,0 +1,14 @@
+@startuml
+actor user
+actor gymAdmin
+user -> gymAdmin: show QR
+gymAdmin -> app :select verify merchandise id
+gymAdmin -> app : scan QR
+app -> app: get transaction_id
+app -> backend: /api/verify_transaction_record/[transactionObjectId, merchandise_id]
+alt success
+backend --> app: success
+else failed
+backend --> app: failed[error_message]
+end
+@enduml
