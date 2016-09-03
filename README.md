@@ -1,6 +1,19 @@
 TNT-Backend
 ===
+Endpoints:
 
+    /api/discovery/gym: list<gym>
+    /api/discovery/merchandise: list<merchandise>
+    /api/gym: list<gym>, gym
+    /api/merchandise: list<merchandise>, merchandise
+    /api/profile: list<user>, user
+    /api/transaction_record : list<transaction_record>, transaction_record
+    /api/verify_transaction_record
+    
+    /api/perform_transaction
+    /api/verify_transaction
+    /api/cancel_transaction
+    
 Some useful tips:
 
 To view DB in docker container, use `docker exec -it tntbackend_db_1 bash`
@@ -75,9 +88,7 @@ Request for Server public key
     POST
     {
         "username":'',
-        "password":'',
-        "clientPublicKey":'',
-        "deviceName":''
+        "password":''
     }
     
 *Response*
@@ -103,11 +114,8 @@ Request for Server public key
     scheme='tnt-user-auth-scheme', realm='user'
     public key encrypted in header
     {
-        "type":"password",
         "username":'',
-        "password":'',
-        "clientPublicKey":'',
-        "deviceName":''
+        "password":''
     }
     
     

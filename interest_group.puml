@@ -1,0 +1,26 @@
+@startuml
+title new user
+actor user
+app -> app: account created
+user -> app:select interest group
+app -> backend:/api/profile
+backend -> openfireServer: create user on openfireServer
+openfireServer --> backend: user created
+backend -> openfireServer: get groups
+openfireServer --> backend: groups
+alt group available
+backend -> backend: assign group to user
+else
+backend -> openfireServer: create group
+openfireServer --> backend: group created
+
+backend -> backend: assign group to user
+end
+backend -> openfireServer: register user to group
+backend -> openfireServer: user added to group
+
+backend --> app: profile updated
+app -> openfireServer:connect
+
+
+@enduml

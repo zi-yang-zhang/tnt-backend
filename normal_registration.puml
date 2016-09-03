@@ -1,0 +1,11 @@
+@startuml
+actor user
+user --> app: register
+app-->backend:/api/register POST{"username":'',"password":''}
+backend-->app: 201 created {id:"", jwt:""}
+user --> app: complete profile
+app-->backend:/api/profile POST user object with jwt
+backend-->app:updated
+ref over app, user: update interest group
+
+@enduml

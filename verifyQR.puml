@@ -2,13 +2,20 @@
 actor user
 actor gymAdmin
 user -> gymAdmin: show QR
-gymAdmin -> app :select verify merchandise id
-gymAdmin -> app : scan QR
-app -> app: get transaction_id
-app -> backend: /api/verify_transaction_record/[transactionObjectId, merchandise_id]
-alt success
-backend --> app: success
+gymAdmin -> gym_app :select verify merchandise id
+gym_app-> user_app: scan QR
+gym_app -> gym_app: get transaction_id
+gym_app -> backend: /api/verify_transaction_record/[transactionRecordObjectId, merchandise_id]
+alt transactionRecord.count > 0 && not expired
+backend -> backend: count-- for transactionRecordObject
+backend -> backend: create new visit record for transactionRecordObject
+backend --> gym_app: success
+push_server --> user_app: success, transactionRecordObject
+else transactionRecord.count == -1 && not expired
+backend --> gym_app: success
+push_server --> user_app: success, transactionRecordObject
 else failed
-backend --> app: failed[error_message]
+backend --> gym_app: failed[error_message]
+push_server --> user_app: suggest to buy
 end
 @enduml
