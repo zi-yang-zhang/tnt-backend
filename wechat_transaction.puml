@@ -1,0 +1,31 @@
+@startuml
+actor user
+user -> app: request to buy
+app -> backend: /api/perform_transaction[userId, gymId, merchandiseId, merchandiseType, paymentType:wechat]
+backend ->DB: search for merchandise(merchandiseType, merchandiseId)
+DB --> backend: merchandise object
+backend -> wechatPaymentAPI: request payment
+wechatPaymentAPI --> backend: prepay_id
+backend -> DB: create transaction object[state:pending, userId, gymId, merchandiseId, createdDate, expiryDate]
+backend --> app: prepay_id, transactionObjectId
+app -> wechatPaymentAPI: request payment
+user -> wechatPaymentAPI: confirm payment
+alt payment success
+wechatPaymentAPI --> app : transaction_id
+app -> backend: /api/verify_transaction/[transaction_id, transactionObjectId]
+backend -> wechatPaymentAPI: verify transaction[transaction_id]
+alt payment verified
+backend -> DB: update transaction object[transaction_id, transactionObjectId, state:success, create QR image]
+backend --> app: success[transaction object]
+else payment not verified
+backend -> DB: delete transaction object[transaction_id]
+backend --> app: failed
+end
+else payment declined
+app -> backend: /api/cancel_transaction/[transactionObjectId]
+backend -> DB: delete transaction object[transaction_id]
+backend --> app: deleted
+app -> app: canceled transaction
+end
+
+@enduml
