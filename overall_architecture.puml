@@ -1,0 +1,49 @@
+@startuml
+
+ node "phone"{
+    [app]
+   }
+
+cloud "JX backend"{
+
+    node "flask"{
+        backend_rest-[server]
+    }
+    database "mongo"{
+        db-[main db]
+    }
+    node "rabbit-mq"{
+        push_notification_rest--[push notification server]
+        publish_notification_rest--[push notification server]
+    }
+}
+
+cloud "Oauth provider"{
+    oauth_rest-[authentication]
+}
+
+cloud "payment provider"{
+    payment_rest-[payment]
+}
+
+cloud "openfire server"{
+    push_im_rest--[chat server]
+    publish_im_rest--[chat server]
+    config_rest--[chat server]
+    database "mysql"{
+        chat_db--[message db]
+    }
+}
+
+[app]-->[backend_rest]: access data
+[push_im_rest]--->[app]:push notification for IM
+[app]--->[publish_im_rest]:send message for IM
+[app]-->[oauth_rest]: authenticate
+[app]-->[payment_rest]: make payment
+[chat server]-[chat_db]
+[server]--[db]
+[server]-->[config_rest]: configuration chat groups
+[server]-->[publish_notification_rest]:publish push notification
+[app]<---[push_notification_rest]:subscribe to push notification
+
+@enduml
