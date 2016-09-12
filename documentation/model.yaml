@@ -1,0 +1,299 @@
+swagger: '2.0'
+info:
+  title: JK backend API
+  description: Jian Ke backend api specification
+  version: 1.0.0
+host: tntrestapi.com
+schemes:
+  - https
+basePath: /api
+produces:
+  - application/json
+paths:
+  /gym:
+    get:
+      summary: Gym object that reprsend gym
+      description: |
+        This endpoint return gym object bases on object id provided
+      parameters:
+        - name: object_id
+          in: query
+          description: Mongo db object id of the gym object
+          required: true
+          type: string
+        - name: Authorization
+          in: header
+          description: jwt token as bearer
+          required: true
+          type: string
+          default: 'bearer:'
+      tags:
+        - Gym
+      responses:
+        '200':
+          description: Gym with provided gym object_id
+          schema:
+            $ref: '#/definitions/Gym'
+        '404':
+          description: Gym not found
+          schema:
+            type: object
+        default:
+          description: Unexpected error
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+definitions:
+  Gym:
+    type: object
+    properties:
+      id:
+        type: string
+        description: Mongo db Id
+      email:
+        type: string
+        description: 'Email of the account, used as unique identifier for the account.'
+      password:
+        type: string
+        description: Encrypted password.
+      name:
+        type: string
+        description: Name of gym
+      address:
+        type: string
+        description: Address of gym
+      smallLogo:
+        type: string
+        description: Small logo URL of the gym
+      bigLogo:
+        type: string
+        description: Big logo URL of the gym
+      servies:
+        type: array
+        description: Services that the gym provides
+        items:
+          $ref: '#/definitions/Service'
+      detail:
+        type: string
+        description: Detail description of the gym
+      geoLocation:
+        type: string
+        description: GEO location of the gym
+      announcements:
+        type: array
+        description: Announcements that the gym published
+        items:
+          $ref: '#/definitions/Announcement'
+      transactionRecords:
+        type: array
+        description: Transaction records of the purchased merchandise offered by the gym
+        items:
+          $ref: '#/definitions/TransactionRecord'
+      equipments:
+        type: array
+        description: Equipments that the gym provides
+        items:
+          $ref: '#/definitions/Equipment'
+  Announcement:
+    type: object
+    properties:
+      id:
+        type: string
+        description: Mongo db Id
+      createTime:
+        type: string
+        description: Time stamp of announcement creation
+      content:
+        type: string
+        description: Content of the Announcement
+      imageURLs:
+        type: array
+        description: Image URls for the Announcement
+        items:
+          type: string
+      scope:
+        type: integer
+        format: int32
+        description: >-
+          Scope of the announcement, 1 for visible to members, 2 for visible to
+          all
+      actionType:
+        type: object
+        description: Included action type for the announcement button
+        properties:
+          type:
+            type: string
+            description: >-
+              Type for the announcement button, link for open url and
+              merchandise for open merchandise purchase
+          content:
+            type: string
+            description: >-
+              Content for the announcement button, url link for link type,
+              merchandise_id for merchandise type
+  Service:
+    type: object
+    properties:
+      id:
+        type: string
+        description: Mongo db Id
+      detail:
+        type: string
+        description: Detail description of the service
+      name:
+        type: string
+        description: Name of the service
+      imageURLs:
+        type: array
+        description: Image URls for the service
+        items:
+          type: string
+  Equipment:
+    type: object
+    properties:
+      id:
+        type: string
+        description: Mongo db Id
+      detail:
+        type: string
+        description: Detail description of the equipment
+      name:
+        type: string
+        description: Name of the equipment
+      imageURLs:
+        type: array
+        description: Image URls for the equipment
+        items:
+          type: string
+      type:
+        type: string
+        description: Type for the equipment
+  TransactionRecord:
+    type: object
+    properties:
+      id:
+        type: string
+        description: Mongo db Id
+      payer:
+        type: string
+        description: Mongo db Id of User that payed for this transaction
+      recipient:
+        type: string
+        description: Mongo db Id of Gym that received the payment for this transaction
+      peymentMethod:
+        type: string
+        description: 'Name of the payment Provider[Wechat, Paypal, GoogleWallet, ApplePay]'
+      merchandiseId:
+        type: string
+        description: Mongo db Id of merchandise that is sold in this transaction
+      transactionState:
+        type: integer
+        format: int32
+        description: 'State of the current transaction[1 for pending, 2 for success]'
+      transactionId:
+        type: string
+        description: Transaction Id provided by payment provider
+      createTime:
+        type: string
+        description: Time stamp of transaction record creation
+      count:
+        type: integer
+        format: int32
+        description: Remaining usage count for the purchased item
+      visitRecords:
+        type: array
+        description: Records of user's usage of the purchased item
+        items:
+          $ref: '#/definitions/visitRecord'
+      startDate:
+        type: string
+        description: Time stamp of the start date of the current purchased item
+      expiryDate:
+        type: string
+        description: Time stamp of the expiry date of the current purchased item
+  visitRecord:
+    type: object
+    properties:
+      id:
+        type: string
+        description: Mongo db Id
+      date:
+        type: string
+        description: Time stamp of visit record
+  Merchandise:
+    type: object
+    properties:
+      id:
+        type: string
+        description: Mongo db Id
+      type:
+        type: integer
+        format: int32
+        description: 'type of the mechandise[1 for training classes, 2 for subscription]'
+      name:
+        type: string
+        description: Name of the merchandise
+      tag:
+        type: string
+        description: Category tag of the merchandise
+      count:
+        type: integer
+        format: int32
+        description: Usage count for the merchandise
+      detail:
+        type: string
+        description: Detail description of the merchandise
+      summary:
+        type: string
+        description: Summary description of the merchandise
+      owner:
+        type: string
+        description: Mongo db Id of the gym that owns the merchandise
+      price:
+        type: object
+        description: Price of the merchandise
+        properties:
+          amount:
+            type: number
+            format: double
+            description: Amount of the price
+          currency:
+            type: string
+            description: Currency of the price
+      expiryInfo:
+        type: object
+        description: Mongo db Id of the gym that owns the merchandise
+        properties:
+          startDate:
+            type: string
+            description: Date when merchandise is good to be used
+          expiryDate:
+            type: string
+            description: Date when merchandise is expired
+      schedule:
+        type: array
+        description: Schedule of when the merchandise is provided
+        items:
+          properties:
+            start:
+              type: string
+              description: Time when merchandise starts to be provided
+            end:
+              type: string
+              description: Time when merchandise stops to be provided
+      imageURLs:
+        type: array
+        description: Image URls for the merchandise
+        items:
+          type: string
+  ErrorResponse:
+    type: object
+    properties:
+      success:
+        type: boolean
+        description: If the request is succeed
+      data:
+        type: object
+        description: Data object of which the endpoint returns
+      exceptionMessage:
+        type: string
+        description: Description of the error if occured
