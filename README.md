@@ -1,19 +1,7 @@
 TNT-Backend
 ===
-Endpoints:
 
-    /api/discovery/gym: list<gym>
-    /api/discovery/merchandise: list<merchandise>
-    /api/gym: list<gym>, gym
-    /api/merchandise: list<merchandise>, merchandise
-    /api/profile: list<user>, user
-    /api/transaction_record : list<transaction_record>, transaction_record
-    /api/verify_transaction_record
-    
-    /api/perform_transaction
-    /api/verify_transaction
-    /api/cancel_transaction
-    
+
 Some useful tips:
 
 To view DB in docker container, use `docker exec -it tntbackend_db_1 bash`
@@ -41,7 +29,7 @@ To view DB in docker container, use `docker exec -it tntbackend_db_1 bash`
     }
     password is verified against sha256 encrypted string from database
 #### Response
-    jwt with claims={'exp': '', 'iat': '', 'user': '', 'level':''}
+    jwt
     expiry in a month.
     
 ### User (OAuth 2)
@@ -73,7 +61,8 @@ Request for Server public key
     public key encrypted
     POST
     {
-        "openid":''
+        "openid":'',
+        "refresh_token":''
     }
     
 #### Password based Authentication
@@ -98,8 +87,7 @@ Request for Server public key
         "data":
         {
                 "token_type":"bearer",
-                "access_token":"eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyIjoiVlx1MDAxNcKbwoNUwoonbFPCu8KhwrYiLCJpYXQiOjE0NDQyNjI1NDMsImV4cCI6MTQ0NDI2MjU2M30.MldruS1PvZaRZIJR4legQaauQ3_DYKxxP2rFnD37Ip4",
-                "refresh_token":"fdb8fdbecf1d03ce5e6125c067733c0d51de209c"
+                "jwt":"eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyIjoiVlx1MDAxNcKbwoNUwoonbFPCu8KhwrYiLCJpYXQiOjE0NDQyNjI1NDMsImV4cCI6MTQ0NDI2MjU2M30.MldruS1PvZaRZIJR4legQaauQ3_DYKxxP2rFnD37Ip4",
         }
     }
     
@@ -126,11 +114,10 @@ Request for Server public key
         "data":
         {
                 "token_type":"bearer",
-                "access_token":"eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyIjoiVlx1MDAxNcKbwoNUwoonbFPCu8KhwrYiLCJpYXQiOjE0NDQyNjI1NDMsImV4cCI6MTQ0NDI2MjU2M30.MldruS1PvZaRZIJR4legQaauQ3_DYKxxP2rFnD37Ip4",
-                "refresh_token":"fdb8fdbecf1d03ce5e6125c067733c0d51de209c"
+                "jwt":"eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyIjoiVlx1MDAxNcKbwoNUwoonbFPCu8KhwrYiLCJpYXQiOjE0NDQyNjI1NDMsImV4cCI6MTQ0NDI2MjU2M30.MldruS1PvZaRZIJR4legQaauQ3_DYKxxP2rFnD37Ip4",
         }
     }
-
+#Resource
 ## Request structure:
 
     {
@@ -226,7 +213,25 @@ Request for Server public key
         def __init__(self, name, resource_type):
             self.message = "Resource exists with name <" + name + "> for " + resource_type
 
+jwt structure:
 
+    jwt with claims={'exp': '', 'iat': '', 'user': email, 'level':''}
+    
+    
+Endpoints:
+
+    /api/discovery/gym: list<gym>
+    /api/discovery/merchandise: list<merchandise>
+    /api/gym: list<gym>, gym
+    /api/merchandise: list<merchandise>, merchandise
+    /api/profile: list<user>, user
+    /api/transaction_record : list<transaction_record>, transaction_record
+    /api/verify_transaction_record
+   
+    /api/perform_transaction
+    /api/verify_transaction
+    /api/cancel_transaction
+    
 ## To start
 
 Make sure you have `docker` and `docker-compose` installed

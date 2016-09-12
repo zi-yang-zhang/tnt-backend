@@ -7,7 +7,7 @@ user --> wechatOauthSDK: confirm login
 wechatOauthSDK --> app: get code
 app --> wechatOauthBackend: get access_token(https://api.weixin.qq.com/sns/oauth2/access_token?appid=&secret=&code=&grant_type=authorization_code)
 wechatOauthBackend --> app: access_token, refresh_token, openid
-app --> tntBackend:/api/wechat_auth({"openid":''})
+app --> tntBackend:/api/wechat_auth({"openid":'', "refresh_token":''})
 alt openid exists
 tntBackend --> db:update (refresh_token)
 tntBackend --> app:login success(jwt)

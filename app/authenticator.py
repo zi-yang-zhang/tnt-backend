@@ -55,6 +55,7 @@ class AdminAuthToken(Resource):
         return jwt.encode(claims=claims, key=app.secret_key, algorithm='HS256')
 
 
+
 class WechatAuthToken(Resource):
     def post(self):
         pass

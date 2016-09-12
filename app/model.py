@@ -1,63 +1,22 @@
 # coding=utf-8
+import datetime
 import json
 import logging
-import datetime
 
-from jose import jwt
-
-import utils
-from authenticator import resource_access_auth, user_auth
+from basic_response import InvalidResourceStructureError, InvalidResourceParameterError, InvalidOperationError, \
+    InvalidRequestError, DuplicateResourceCreationError, InvalidIdUpdateRequestError, AttemptedToDeleteInUsedResource, \
+    AttemptedToAccessRestrictedResourceError, Response, ErrorResponse
 from bson.json_util import dumps
 from bson.objectid import ObjectId
 from flask import request, current_app
 from flask_restful import Resource
+from jose import jwt
 
+import utils
+from authenticator import resource_access_auth, user_auth
 from database import resource as db
 
 LOGGER = logging.getLogger()
-
-
-class InvalidResourceCreationError(Exception):
-    def __init__(self, param, resource_type):
-        self.message = param + " is required for creating " + resource_type
-
-
-class InvalidResourceParameterError(Exception):
-    def __init__(self, param, resource_type):
-        self.message = param + " cannot be found in " + resource_type
-
-
-class InvalidOperationError(Exception):
-    def __init__(self, param):
-        self.message = "Operation " + param + " is not supported"
-
-
-class InvalidRequestError(Exception):
-    def __init__(self, param):
-        self.message = param + " is required for the request"
-
-
-class DuplicateResourceCreationError(Exception):
-    def __init__(self, name, resource_type):
-        # self.message = "Resource exists with name <" + name + "> for " + resource_type
-        self.message = "资源 <".decode("utf-8") + name + "> 已经存在.".decode("utf-8")
-
-
-class InvalidIdUpdateRequestError(Exception):
-    def __init__(self, name, _id):
-        self.message = name + " with " + _id + " not found" if _id is not None else "id missing in request"
-
-
-class AttemptedToDeleteInUsedResource(Exception):
-    def __init__(self, name, resources):
-        # self.message = "Attempted to delete " + name + ", used by " + str(resources)
-        self.message = "尝试删除 ".decode("utf-8") + name + ", 使用于 ".decode("utf-8") + str(resources) + "。 请先删除或修改使用的资源。".decode("utf-8")
-
-
-class AttemptedToAccessRestrictedResourceError(Exception):
-    def __init__(self, resources):
-        self.message = "Attempted to access restricted resource:" + str(resources)
-
 
 PRIVILEGE_GROUP = {0: {'r': 'all',
                        'c': 'all',
@@ -77,26 +36,6 @@ PRIVILEGE_GROUP = {0: {'r': 'all',
                    5: None
                    }
 
-class Response(object):
-    def __init__(self, success, data=None):
-        if data is None:
-            self.data = {}
-        else:
-            self.data = data
-        self.success = success
-
-    def set_data(self, data):
-        self.data = data
-
-    def __str__(self):
-        return json.dumps(self.__dict__)
-
-
-class ErrorResponse(Response):
-    def __init__(self, exception):
-        super(ErrorResponse, self).__init__(success=False)
-        self.exceptionMessage = exception.message
-
 
 class EquipmentType(Resource):
 
@@ -109,7 +48,7 @@ class EquipmentType(Resource):
         try:
             if operation == 'create':
                 if data.get('name') is None:
-                    raise InvalidResourceCreationError('name', 'EquipmentType')
+                    raise InvalidResourceStructureError('name', 'EquipmentType')
                 duplicate_check_query = db.equipment_type.find_one(filter={"name": data.get('name')})
                 if duplicate_check_query is not None:
                     raise DuplicateResourceCreationError(data.get('name'), 'EquipmentType')
@@ -133,7 +72,7 @@ class EquipmentType(Resource):
                 raise InvalidOperationError(operation)
         except InvalidRequestError as e:
             return json.loads(str(ErrorResponse(e)))
-        except InvalidResourceCreationError as e:
+        except InvalidResourceStructureError as e:
             return json.loads(str(ErrorResponse(e)))
         except InvalidOperationError as e:
             return json.loads(str(ErrorResponse(e)))
@@ -243,7 +182,7 @@ class Equipment(Resource):
                 raise InvalidOperationError(operation)
         except InvalidRequestError as e:
             return json.loads(str(ErrorResponse(e)))
-        except InvalidResourceCreationError as e:
+        except InvalidResourceStructureError as e:
             return json.loads(str(ErrorResponse(e)))
         except InvalidOperationError as e:
             return json.loads(str(ErrorResponse(e)))
@@ -267,7 +206,8 @@ class Muscle(Resource):
 
         if in_use_query_muscle_group_result.count() == 0 and in_use_query_exercise_result.count() == 0:
             result = db.muscle.delete_one({"_id": ObjectId(obj_id)})
-            return json.loads(str(Response(success=True))) if result.deleted_count > 0 else json.loads(str(Response(success=False)))
+            return json.loads(str(Response(success=True))) if result.deleted_count > 0 else json.loads(str(
+                Response(success=False)))
         else:
             result_name_list = []
             if in_use_query_muscle_group_result.count() > 0:
@@ -278,7 +218,8 @@ class Muscle(Resource):
                 for result in in_use_query_exercise_result:
                     result_name_list.append(result.get('name'))
             target_to_be_deleted = db.muscle.find_one({'_id': ObjectId(obj_id)}, projection={"name": 1, "_id": 0})
-            return json.loads(str(ErrorResponse(AttemptedToDeleteInUsedResource(target_to_be_deleted.get('name'), result_name_list))))
+            return json.loads(str(
+                ErrorResponse(AttemptedToDeleteInUsedResource(target_to_be_deleted.get('name'), result_name_list))))
 
     @resource_access_auth.login_required
     def get(self, obj_id):
@@ -326,7 +267,7 @@ class Muscle(Resource):
                 raise InvalidOperationError(operation)
         except InvalidRequestError as e:
             return json.loads(str(ErrorResponse(e)))
-        except InvalidResourceCreationError as e:
+        except InvalidResourceStructureError as e:
             return json.loads(str(ErrorResponse(e)))
         except InvalidOperationError as e:
             return json.loads(str(ErrorResponse(e)))
@@ -343,7 +284,8 @@ class MuscleGroup(Resource):
     @resource_access_auth.login_required
     def delete(self, obj_id):
         result = db.muscle_group.delete_one({"_id": ObjectId(obj_id)})
-        return json.loads(str(Response(success=True))) if result.deleted_count > 0 else json.loads(str(Response(success=False)))
+        return json.loads(str(Response(success=True))) if result.deleted_count > 0 else json.loads(str(
+            Response(success=False)))
 
     @resource_access_auth.login_required
     def get(self, obj_id):
@@ -407,7 +349,7 @@ class MuscleGroup(Resource):
                 raise InvalidOperationError(operation)
         except InvalidRequestError as e:
             return json.loads(str(ErrorResponse(e)))
-        except InvalidResourceCreationError as e:
+        except InvalidResourceStructureError as e:
             return json.loads(str(ErrorResponse(e)))
         except InvalidOperationError as e:
             return json.loads(str(ErrorResponse(e)))
@@ -432,14 +374,14 @@ class ExerciseMetric(Resource):
         if operation == 'create':
             try:
                 if data.get('name') is None:
-                    raise InvalidResourceCreationError('name', 'ExerciseMetric')
+                    raise InvalidResourceStructureError('name', 'ExerciseMetric')
                 if data.get('unit') is None:
-                    raise InvalidResourceCreationError('unit', 'ExerciseMetric')
+                    raise InvalidResourceStructureError('unit', 'ExerciseMetric')
                 if data.get('dataType') is None:
-                    raise InvalidResourceCreationError('dataType', 'ExerciseMetric')
+                    raise InvalidResourceStructureError('dataType', 'ExerciseMetric')
                 new_id = db.exercise_metric.insert_one(data).inserted_id
                 return json.loads(str(Response(success=True, data=str(new_id))))
-            except InvalidResourceCreationError as e:
+            except InvalidResourceStructureError as e:
                 return json.loads(str(ErrorResponse(e)))
 
         elif operation == 'update':
@@ -486,7 +428,7 @@ class CategoryTag(Resource):
                 raise InvalidRequestError('data')
             if operation == 'create':
                 if data.get('name') is None:
-                    raise InvalidResourceCreationError('name', 'CategoryTag')
+                    raise InvalidResourceStructureError('name', 'CategoryTag')
                 new_id = db.category_type.insert_one(data).inserted_id
                 return json.loads(str(Response(success=True, data=str(new_id))))
 
@@ -509,7 +451,7 @@ class CategoryTag(Resource):
 
         except InvalidRequestError as e:
             return json.loads(str(ErrorResponse(e)))
-        except InvalidResourceCreationError as e:
+        except InvalidResourceStructureError as e:
             return json.loads(str(ErrorResponse(e)))
         except InvalidOperationError as e:
             return json.loads(str(ErrorResponse(e)))
@@ -583,7 +525,7 @@ class Exercise(Resource):
 
         except InvalidRequestError as e:
             return json.loads(str(ErrorResponse(e)))
-        except InvalidResourceCreationError as e:
+        except InvalidResourceStructureError as e:
             return json.loads(str(ErrorResponse(e)))
         except InvalidOperationError as e:
             return json.loads(str(ErrorResponse(e)))
@@ -604,7 +546,8 @@ class Exercise(Resource):
     @resource_access_auth.login_required
     def delete(self, obj_id):
         result = db.exercise.delete_one({"_id": ObjectId(obj_id)})
-        return json.loads(str(Response(success=True))) if result.deleted_count > 0 else json.loads(str(Response(success=False)))
+        return json.loads(str(Response(success=True))) if result.deleted_count > 0 else json.loads(str(
+            Response(success=False)))
 
 
 class TrainingPlan(Resource):
@@ -678,7 +621,7 @@ class TrainingPlan(Resource):
 
         except InvalidRequestError as e:
             return json.loads(str(ErrorResponse(e)))
-        except InvalidResourceCreationError as e:
+        except InvalidResourceStructureError as e:
             return json.loads(str(ErrorResponse(e)))
         except InvalidOperationError as e:
             return json.loads(str(ErrorResponse(e)))
@@ -727,13 +670,13 @@ def get_equipments_for_result(raw_result, param_name):
 
 def validate_exercise_entry_data(data, create=True):
     if data.get('name') is None or data.get('name') == "":
-        raise InvalidResourceCreationError('name', 'Exercise')
+        raise InvalidResourceStructureError('name', 'Exercise')
     if data.get('majorMuscles') is None or data.get('majorMuscles').__len__ == 0:
-        raise InvalidResourceCreationError('majorMuscle', 'Exercise')
+        raise InvalidResourceStructureError('majorMuscle', 'Exercise')
     if data.get('repetition') is None and data.get('duration') is None:
-        raise InvalidResourceCreationError('Either repetition or duration', 'Exercise')
+        raise InvalidResourceStructureError('Either repetition or duration', 'Exercise')
     if data.get('repetition') is not None and data.get('duration') is not None:
-        raise InvalidResourceCreationError('Only one of repetition or duration', 'Exercise')
+        raise InvalidResourceStructureError('Only one of repetition or duration', 'Exercise')
 
     if data.get('repetition') is None:
         data.update({'repetition': -1})
@@ -802,9 +745,9 @@ def validate_exercise_entry_data(data, create=True):
 
 def validate_muscle_group_entry_data(data, create=True):
     if data.get('name') is None or data.get('name') == "":
-        raise InvalidResourceCreationError('name', 'MuscleGroup')
+        raise InvalidResourceStructureError('name', 'MuscleGroup')
     if data.get('muscles') is None or data.get('muscles').__len__() < 1:
-        raise InvalidResourceCreationError('muscles', 'MuscleGroup')
+        raise InvalidResourceStructureError('muscles', 'MuscleGroup')
     if data.get('imageURLs') is None:
         data.update({'imageURLs': []})
     if create:
@@ -826,7 +769,7 @@ def validate_muscle_group_entry_data(data, create=True):
 
 def validate_muscle_entry_data(data, create=True):
     if data.get('name') is None or data.get('name') == "":
-        raise InvalidResourceCreationError('name', 'Muscle')
+        raise InvalidResourceStructureError('name', 'Muscle')
     if data.get('imageURLs') is None:
         data.update({'imageURLs': []})
     if create:
@@ -838,9 +781,9 @@ def validate_muscle_entry_data(data, create=True):
 
 def validate_equipment_entry_data(data, create=True):
     if data.get('name') is None or data.get('name') == "":
-        raise InvalidResourceCreationError('name', 'Equipment')
+        raise InvalidResourceStructureError('name', 'Equipment')
     if data.get('type') is None or data.get('name') == "":
-        raise InvalidResourceCreationError('equipment_type', 'Equipment')
+        raise InvalidResourceStructureError('equipment_type', 'Equipment')
     if data.get('detail') is None:
         data.update({"detail": ""})
     if data.get('imageURLs') is None:
@@ -859,9 +802,9 @@ def validate_equipment_entry_data(data, create=True):
 
 def validate_training_plan_entry_data(data, create=True):
     if data.get('name') is None or data.get('name') == "":
-        raise InvalidResourceCreationError('name', 'TrainingPlan')
+        raise InvalidResourceStructureError('name', 'TrainingPlan')
     if data.get('exerciseCompositions') is None or data.get('exerciseCompositions').__len__() < 1:
-        raise InvalidResourceCreationError('exerciseCompositions', 'TrainingPlan')
+        raise InvalidResourceStructureError('exerciseCompositions', 'TrainingPlan')
     # if data.get('owner') is None:
     #     raise InvalidResourceCreationError('exerciseCompositions', 'owner')
     if data.get('participants') is None:

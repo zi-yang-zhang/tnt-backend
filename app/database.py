@@ -6,6 +6,8 @@ client = MongoClient(os.environ['MONGO_PORT_27017_TCP_ADDR'], 27017, connect=Fal
 resource = client.main
 admin = client.admin
 user = client.user
+gym = client.gym
+transaction = client.transaction
 
 
 def initialize():
