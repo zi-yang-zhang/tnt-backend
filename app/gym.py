@@ -77,7 +77,10 @@ class Merchandise(Resource):
                     for result in raw_results:
                         results.append(sanitize_merchandise_return_data(result))
                 current_app.logger.info('response sent %s', str(Response(success=True, data=results)))
-                return json.loads(str(Response(success=True, data=results)))
+                if len(results) == 0:
+                    return json.loads(str(Response(success=False, data=results))), 404
+                else:
+                    return json.loads(str(Response(success=True, data=results)))
             else:
                 raise InvalidOperationError(operation)
 
@@ -232,7 +235,7 @@ def generate_update_merchandise_command(data=None):
 
 def sanitize_merchandise_return_data(data=None):
     if data is not None:
-        data.update({'id': str(data.get("_id"))})
+        data.update({'_id': str(data.get("_id"))})
         if data.get('tag') is None:
             data.update({'tag': ""})
         if data.get('detail') is None:
@@ -249,7 +252,7 @@ def sanitize_merchandise_return_data(data=None):
 
 def sanitize_gym_return_data(data=None):
     if data is not None:
-        data.update({'id': str(data.get("_id"))})
+        data.update({'_id': str(data.get("_id"))})
         if data.get('detail') is None:
             data.update({'detail': ""})
         if data.get('smallLogo') is None:
@@ -260,12 +263,9 @@ def sanitize_gym_return_data(data=None):
             data.update({'services': []})
         if data.get('announcements') is None:
             data.update({'announcements': []})
-        if data.get('transactionRecords') is None:
-            data.update({'transactionRecords': []})
-        if data.get('merchandise') is None:
-            data.update({'merchandise': []})
         if data.get('equipments') is None:
             data.update({'equipments': []})
+        data.update({'geoLocation': data.get('geoLocation').get('coordinates')})
     return data
 
 
@@ -292,8 +292,8 @@ class Gym(Resource):
         except InvalidId as e:
             return json.loads(str(ErrorResponse(e))), 400
         if result is None:
-            return Response(False, ""), 404
-        return Response(True, sanitize_gym_return_data(utils.bson_to_json(result)))
+            return json.loads(str(Response(False, ""))), 404
+        return json.loads(str(Response(True, sanitize_gym_return_data(utils.bson_to_json(result)))))
 
     def post(self):
         try:
@@ -346,7 +346,10 @@ class Gym(Resource):
                     for result in raw_results:
                         results.append(sanitize_gym_return_data(result))
                 current_app.logger.info('response sent %s', str(Response(success=True, data=results)))
-                return json.loads(str(Response(success=True, data=results)))
+                if len(results) == 0:
+                    return json.loads(str(Response(success=False, data=results))), 404
+                else:
+                    return json.loads(str(Response(success=True, data=results)))
         except InvalidRequestError as e:
             return json.loads(str(ErrorResponse(e))), 400
         except InvalidResourceStructureError as e:
@@ -376,6 +379,11 @@ def validate_gym_entry_data_for_creation(data=None):
         raise InvalidResourceStructureError('address', 'Gym')
     if data.get('geoLocation') is None or data.get('geoLocation') == "":
         raise InvalidResourceStructureError('geoLocation', 'Gym')
+    elif len(data.get('geoLocation')) != 2:
+        raise InvalidResourceStructureError('geoLocation', 'Gym')
+    else:
+        coordinates = data.get('geoLocation')
+        data.update({'geoLocation': {'type': "Point", 'coordinates': coordinates}})
     duplicate = db.gym.find_one({"email": data.get('email')})
     if duplicate is not None:
         raise DuplicateResourceCreationError('email', 'Gym')
