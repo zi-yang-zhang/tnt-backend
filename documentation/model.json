@@ -105,21 +105,28 @@
                     "description": "Detail description of the gym"
                 },
                 "geoLocation": {
-                    "type": "string",
-                    "description": "GEO location of the gym"
+                    "type": "object",
+                    "description": "GEO location of the gym",
+                    "properties": {
+                        "type": {
+                            "type": "string",
+                            "description": "Value \"Point\""
+                        },
+                        "coordinates": {
+                            "type": "array",
+                            "description": "coordinates of the location",
+                            "items": {
+                                "type": "number",
+                                "format": "double"
+                            }
+                        }
+                    }
                 },
                 "announcements": {
                     "type": "array",
                     "description": "Announcements that the gym published",
                     "items": {
                         "$ref": "#/definitions/Announcement"
-                    }
-                },
-                "transactionRecords": {
-                    "type": "array",
-                    "description": "Transaction records of the purchased merchandise offered by the gym",
-                    "items": {
-                        "$ref": "#/definitions/TransactionRecord"
                     }
                 },
                 "equipments": {
@@ -235,7 +242,7 @@
                 },
                 "payer": {
                     "type": "string",
-                    "description": "Mongo db Id of User that payed for this transaction"
+                    "description": "email of User that payed for this transaction"
                 },
                 "recipient": {
                     "type": "string",

@@ -4,7 +4,7 @@ from bson.objectid import ObjectId
 from flask import request, current_app, make_response
 from flask_restful import Resource
 import utils
-from database import transaction as db
+from database import transaction_db as db
 
 from basic_response import InvalidResourceStructureError, InvalidResourceParameterError, InvalidOperationError, \
     InvalidRequestError, DuplicateResourceCreationError, InvalidIdUpdateRequestError, AttemptedToDeleteInUsedResource, \

@@ -1,15 +1,19 @@
 import os
-from pymongo import MongoClient, ALL
+from pymongo import MongoClient, ALL, GEOSPHERE
+from flask import current_app
 
 
 client = MongoClient(os.environ['MONGO_PORT_27017_TCP_ADDR'], 27017, connect=False)
-resource = client.main
-admin = client.admin
-user = client.user
-gym = client.gym
-transaction = client.transaction
+resource_db = client.main
+admin_db = client.admin
+user_db = client.user
+gym_db = client.gym
+transaction_db = client.transaction
 
 
 def initialize():
-    resource.set_profiling_level(level=ALL)
-    admin.set_profiling_level(level=ALL)
+    current_app.logger.info('Initialize Database')
+    resource_db.set_profiling_level(level=ALL)
+    admin_db.set_profiling_level(level=ALL)
+    gym_db.set_profiling_level(level=ALL)
+    gym_db.gym.create_index([("geoLocation", GEOSPHERE)], background=True)

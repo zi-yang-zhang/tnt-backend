@@ -75,4 +75,4 @@ class ErrorResponse(Response):
         super(ErrorResponse, self).__init__(success=False)
         if hasattr(exception, 'code'):
             self.errorCode = exception.code
-        self.exceptionMessage = exception.message
+        self.exceptionMessage = str(exception.message)

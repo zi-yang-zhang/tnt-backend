@@ -1,17 +1,16 @@
 from jose import jwt
 
 from authenticator import user_auth
-from bson.json_util import dumps
 from bson.errors import InvalidId
 from bson.objectid import ObjectId
-from flask import request, current_app, make_response
+from flask import request, current_app
 from flask_restful import Resource
 import utils
-from database import gym as db
+from database import gym_db as db
 import json
 
 from basic_response import InvalidResourceStructureError, InvalidResourceParameterError, InvalidOperationError, \
-    InvalidRequestError, DuplicateResourceCreationError, InvalidIdUpdateRequestError, AttemptedToDeleteInUsedResource, \
+    InvalidRequestError, DuplicateResourceCreationError, InvalidIdUpdateRequestError,  \
     AttemptedToAccessRestrictedResourceError, Response, ErrorResponse, NotSupportedOperationError
 
 
@@ -84,6 +83,10 @@ class Merchandise(Resource):
             else:
                 raise InvalidOperationError(operation)
 
+        except TypeError as e:
+            return json.loads(str(ErrorResponse(e))), 400
+        except InvalidId as e:
+            return json.loads(str(ErrorResponse(e))), 400
         except InvalidRequestError as e:
             return json.loads(str(ErrorResponse(e))), 400
         except InvalidResourceStructureError as e:
@@ -157,14 +160,16 @@ def validate_merchandise_entry_data_for_creation(data=None):
         raise InvalidResourceStructureError('detail', 'Merchandise')
     if data.get('owner') is None or data.get('owner') == "":
         raise InvalidResourceStructureError('owner', 'Merchandise')
+    else:
+        gym_id = data.get('owner')
+        owner = db.gym.find_one({"_id": ObjectId(gym_id)})
+        if owner is None:
+            raise InvalidResourceParameterError('owner', 'Merchandise')
+        else:
+            data.update({'owner': owner.get("_id")})
     if data.get('price') is None or data.get('price') == "":
         data.update({'price': {'amount': 0, 'currency': "CNY"}})
-    gym_id = data.get('owner')
-    owner = db.gym.find_one({"_id": ObjectId(gym_id)})
-    if owner is None:
-        raise InvalidResourceParameterError('owner', 'Merchandise')
-    else:
-        data.update({'owner': owner.get("_id")})
+
     return data
 
 
@@ -246,7 +251,10 @@ def sanitize_merchandise_return_data(data=None):
             data.update({'schedule': []})
         if data.get('imageURLs') is None:
             data.update({'imageURLs': []})
-        data.update({'owner': str(data.get("owner"))})
+        gym_id = data.get('owner')
+        owner = db.gym.find_one({"_id": gym_id})
+        owner.update({'_id': str(owner.get("_id"))})
+        data.update({'owner': owner})
     return data
 
 
@@ -265,6 +273,7 @@ def sanitize_gym_return_data(data=None):
             data.update({'announcements': []})
         if data.get('equipments') is None:
             data.update({'equipments': []})
+        del data['password']
         data.update({'geoLocation': data.get('geoLocation').get('coordinates')})
     return data
 
@@ -331,9 +340,28 @@ class Gym(Resource):
                     raw_results = db.gym.find(filter=criteria, limit=limit)
                     for result in raw_results:
                         results.append(sanitize_gym_return_data(result))
-                elif data.get('geoLocation') is not None:
-                    #Todo: will be based on radius
-                    pass
+                elif data.get('near') is not None:
+                    near_field = data.get('near')
+                    if near_field.get('coordinates') is None or near_field.get('coordinates') == "" or not isinstance(near_field.get('coordinates'), list) or len(near_field.get('coordinates')) < 2 or len(near_field.get('coordinates')) > 2:
+                        raise InvalidResourceStructureError('coordinates', 'near')
+                    else:
+                        command = {}
+                        near_target = {}
+                        coordinates = near_field.get('coordinates')
+                        near_target['$geometry'] = {'type': "Point", 'coordinates': coordinates}
+                        if near_field.get('max') is not None:
+                            near_target['$maxDistance'] = near_field.get('max')
+                        if near_field.get('min') is not None:
+                            near_target['$minDistance'] = near_field.get('min')
+                        command['$near'] = near_target
+                        raw_results = db.gym.find(filter={"geoLocation": command}, limit=limit)
+                        for result in raw_results:
+                            results.append(sanitize_gym_return_data(result))
+                        current_app.logger.info('response sent %s', str(Response(success=True, data=results)))
+                        if len(results) == 0:
+                            return json.loads(str(Response(success=False, data=results))), 404
+                        else:
+                            return json.loads(str(Response(success=True, data=results)))
                 elif data.get('keyword') is not None:
                     keyword_field = data.get('keyword')
                     subquery = []
@@ -377,7 +405,7 @@ def validate_gym_entry_data_for_creation(data=None):
         raise InvalidResourceStructureError('name', 'Gym')
     if data.get('address') is None or data.get('address') == "":
         raise InvalidResourceStructureError('address', 'Gym')
-    if data.get('geoLocation') is None or data.get('geoLocation') == "":
+    if data.get('geoLocation') is None or data.get('geoLocation') == "" or not isinstance(data.get('geoLocation'), list):
         raise InvalidResourceStructureError('geoLocation', 'Gym')
     elif len(data.get('geoLocation')) != 2:
         raise InvalidResourceStructureError('geoLocation', 'Gym')
@@ -432,14 +460,6 @@ def generate_update_gym_command(data=None):
             if '$push' not in command:
                 command['$push'] = {}
             command['$push']['service'] = {'$each': data.get('service')}
-
-    # if data.get('equipments') is not None:
-    #     if not isinstance(data.get('equipments'), list):
-    #         raise InvalidResourceParameterError('equipments', 'Gym')
-    #     elif len(data.get('equipments')) > 0:
-    #         if '$push' not in command:
-    #             command['$push'] = {}
-    #         command['$push']['equipments'] = {'$each': data.get('equipments')}
 
     if data.get('announcements') is not None:
         validate_announcement_entry_data(data.get('announcements'))

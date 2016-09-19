@@ -14,7 +14,7 @@ from jose import jwt
 
 import utils
 from authenticator import resource_access_auth, user_auth
-from database import resource as db
+from database import resource_db as db
 
 LOGGER = logging.getLogger()
 

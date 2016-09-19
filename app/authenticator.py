@@ -9,7 +9,7 @@ from jose import jwt, JWTError
 from passlib.hash import sha256_crypt
 import requests
 
-from database import admin as db
+from database import admin_db as db
 
 admin_token_auth = HTTPTokenAuth(scheme='tnt-admin-auth-scheme', realm='admin')
 resource_access_auth = HTTPTokenAuth(scheme='Bearer', realm='resource')

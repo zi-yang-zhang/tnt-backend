@@ -121,7 +121,7 @@ Request for Server public key
 ## Request structure:
 
     {
-        "operation": "create",
+        "operation": "",
         "data":{
         }
     
@@ -232,10 +232,61 @@ Endpoints:
     /api/verify_transaction
     /api/cancel_transaction
     
+### POST: /api/gym: list\<gym\>, gym
+
+    create:
+    {
+        "operation": "create",
+        "data":{
+            "email":"",
+            "password":"",
+            "name":"",
+            "address":"",
+            "geoLocation":[<longitude> , <latitude>]
+            
+        }
+    }
+    query(email):
+    {
+        "operation": "query",
+        "data":{
+            "email":"test@test.com",
+            "find":10
+        }
+    }   
+    query(geo):
+    {
+        "operation": "query",
+        "data":{
+        	"near":{
+        	    "coordinates":[<longitude> , <latitude>],
+                "max":100,
+                "min":20
+        	},
+        	"find":10
+        }
+    }
+    query(keyword, query in "name", "address", "detail"):
+    {
+        "operation": "query",
+        "data":{
+        	"keyword":"",
+        	"find":10
+        }
+    }
+    query(address):
+    {
+        "operation": "query",
+        "data":{
+        	"address":"",
+        	"find":10
+        }
+    }
+
 ## To start
 
 Make sure you have `docker` and `docker-compose` installed
 
 Run `docker version` to make sure you have docker server daemon running, if not, run `start docker` with root.
 
-Then at the root dir, run `docker-compose build`, after building, run `docker-compose up`
+Then at the root dir, run `docker-compose -f docker-compose-dev.yml build`, after building, run `docker-compose -f docker-compose-dev.yml up`

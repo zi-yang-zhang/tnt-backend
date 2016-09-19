@@ -5,7 +5,7 @@ from jose import jwt, JWTError
 import os
 from flask import Flask
 from router import router_blueprint, router
-
+import database
 
 app = Flask('tnt-core', static_folder='./static')
 app.config.from_pyfile(os.environ['setting'])
@@ -14,6 +14,8 @@ app.register_blueprint(router_blueprint)
 logging.getLogger('flask_cors').level = logging.DEBUG if app.debug else logging.INFO
 fileConfig('logging_config.ini')
 logger = app.logger
+with app.app_context():
+    database.initialize()
 
 
 @app.route('/')
