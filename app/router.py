@@ -16,8 +16,8 @@ router.add_resource(model.CategoryTag, '/api/category_tag/<string:obj_id>', '/ap
 router.add_resource(model.Exercise, '/api/exercise/<string:obj_id>', '/api/exercise/')
 router.add_resource(AdminAuthToken, '/api/auth/')
 router.add_resource(WechatAuthToken, '/api/wechat_auth')
-router.add_resource(gym.Gym, '/api/gym/<string:obj_id>', '/api/gym/')
-router.add_resource(gym.Merchandise, '/api/merchandise/<string:obj_id>', '/api/merchandise/')
+router.add_resource(gym.Gym, '/api/gym/')
+router.add_resource(gym.Merchandise, '/api/merchandise/')
 
 
 

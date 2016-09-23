@@ -1,9 +1,20 @@
+import json
 import logging
 from logging.config import fileConfig
-from flask import send_from_directory, request, make_response, redirect
+
+from bson.errors import InvalidId
+from flask import send_from_directory, request, make_response, redirect, jsonify
 from jose import jwt, JWTError
 import os
 from flask import Flask
+from pymongo.errors import WriteError
+import ast
+
+from basic_response import DuplicateResourceCreationError, InvalidRequestError, MongoErrorResponse, \
+    InvalidResourceStructureError, InvalidResourceParameterError, InvalidIdUpdateRequestError, \
+    AttemptedToAccessRestrictedResourceError, InvalidRequestParamErrorResponse
+
+from basic_response import ErrorResponse
 from router import router_blueprint, router
 import database
 
@@ -60,4 +71,72 @@ def add_header(r):
     r.headers["Pragma"] = "no-cache"
     r.headers["Expires"] = "0"
     r.headers['Cache-Control'] = 'public, max-age=0'
+    payload = json.loads(r.get_data())
+    if payload.get('message') is not None:
+        r.set_data(InvalidRequestParamErrorResponse(payload.get('message')))
     return r
+
+
+# Resource errors
+@app.errorhandler(DuplicateResourceCreationError)
+def handle_invalid_usage(error):
+    response = jsonify(ErrorResponse(error).__dict__)
+    response.status_code = 400
+    return response
+
+
+@app.errorhandler(InvalidRequestError)
+def handle_invalid_usage(error):
+    response = jsonify(ErrorResponse(error).__dict__)
+    response.status_code = 400
+    return response
+
+
+@app.errorhandler(WriteError)
+def handle_invalid_usage(error):
+    response = jsonify(MongoErrorResponse(error).__dict__)
+    response.status_code = 400
+    return response
+
+
+@app.errorhandler(InvalidResourceStructureError)
+def handle_invalid_usage(error):
+    response = jsonify(ErrorResponse(error).__dict__)
+    response.status_code = 400
+    return response
+
+
+@app.errorhandler(InvalidResourceParameterError)
+def handle_invalid_usage(error):
+    response = jsonify(ErrorResponse(error).__dict__)
+    response.status_code = 400
+    return response
+
+
+@app.errorhandler(InvalidIdUpdateRequestError)
+def handle_invalid_usage(error):
+    response = jsonify(ErrorResponse(error).__dict__)
+    response.status_code = 400
+    return response
+
+
+@app.errorhandler(AttemptedToAccessRestrictedResourceError)
+def handle_invalid_usage(error):
+    response = jsonify(ErrorResponse(error).__dict__)
+    response.status_code = 401
+    return response
+
+
+@app.errorhandler(TypeError)
+def handle_invalid_usage(error):
+    response = jsonify(ErrorResponse(error).__dict__)
+    response.status_code = 400
+    return response
+
+
+@app.errorhandler(InvalidId)
+def handle_invalid_usage(error):
+    response = jsonify(ErrorResponse(error).__dict__)
+    response.status_code = 400
+    return response
+

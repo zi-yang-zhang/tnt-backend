@@ -16,45 +16,151 @@ paths:
       description: |
         This endpoint return gym object bases on object id provided
       parameters:
-        - name: object_id
+        - name: id
           in: query
           description: Mongo db object id of the gym object
-          required: true
           type: string
-        - name: Authorization
-          in: header
-          description: jwt token as bearer
-          required: true
+        - name: email
+          in: query
+          description: email of the gym object
           type: string
-          default: 'bearer:'
+        - name: address
+          in: query
+          description: address of the gym object
+          type: string
+        - name: keyword
+          in: query
+          description: keyword for query
+          type: string
+        - name: coordinates
+          in: query
+          description: Coordinates of the center for geo query
+          type: array
+          items:
+            type: number
+            format: float
+        - name: min
+          in: query
+          description: min distance for the center for geo query
+          type: number
+          format: float
+        - name: max
+          in: query
+          description: max distance for the center for geo query
+          type: number
+          format: float
+        - name: find
+          in: query
+          type: integer
+          format: int32
+          description: number of result needed
       tags:
         - Gym
       responses:
         '200':
           description: Gym with provided gym object_id
           schema:
-            $ref: '#/definitions/Gym'
+            type: object
+            properties:
+              success:
+                type: boolean
+                description: If the request is succeed
+              data:
+                type: array
+                items:
+                  $ref: '#/definitions/Gym'
+            
         '404':
           description: Gym not found
           schema:
             type: object
+        '400':
+          description: Unexpected error
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        default:
+          description: Unexpected error
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+    post:
+      summary: Gym object that reprsend gym
+      description: |
+        This endpoint return gym object bases on object id provided
+      parameters:
+        - name: Payload
+          in: body
+          description: Gym Object to be created
+          required: true
+          schema:
+            $ref: '#/definitions/CreateGymPayload'
+        
+      tags:
+        - Gym
+      responses:
+        '201':
+          description: Gym with provided gym object_id
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                description: If the request is succeed
+              data:
+                type: string
+                description: Id of the new created Gym record
+            
+        '400':
+          description: Unexpected error
+          schema:
+            $ref: '#/definitions/ErrorResponse'
         default:
           description: Unexpected error
           schema:
             $ref: '#/definitions/ErrorResponse'
 definitions:
+  CreateGymPayload:
+    type: object
+    required:
+    - email
+    - password
+    - name
+    - address
+    - geoLocation
+    properties:
+      email:
+        type: string
+        description: email of gym
+      password:
+        type: string
+        description: password of gym
+      name:
+        type: string
+        description: Name of gym
+      address:
+        type: string
+        description: Address of gym
+      geoLocation:
+        type: array
+        description: coordinates of the location[longitude, latitude]
+        items:
+          type: number
+          format: double
+      smallLogo:
+        type: string
+        description: Small logo URL of the gym
+      bigLogo:
+        type: string
+        description: Big logo URL of the gym
+      detail:
+        type: string
+        description: Detail description of the gym
+
   Gym:
     type: object
     properties:
       id:
         type: string
         description: Mongo db Id
-      email:
-        type: string
-        description: 'Email of the account, used as unique identifier for the account.'
-      password:
-        type: string
-        description: Encrypted password.
       name:
         type: string
         description: Name of gym
@@ -76,18 +182,11 @@ definitions:
         type: string
         description: Detail description of the gym
       geoLocation:
-        type: object
-        description: GEO location of the gym
-        properties:
-          type:
-            type: string
-            description: Value "Point"
-          coordinates:
-            type: array
-            description: coordinates of the location
-            items:
-              type: number
-              format: double
+        type: array
+        description: coordinates of the location[longitude, latitude]
+        items:
+          type: number
+          format: double
       announcements:
         type: array
         description: Announcements that the gym published
@@ -266,7 +365,6 @@ definitions:
             description: Currency of the price
       expiryInfo:
         type: object
-        description: Mongo db Id of the gym that owns the merchandise
         properties:
           startDate:
             type: string

@@ -283,6 +283,10 @@ Endpoints:
         }
     }
 
+## To view API documentation
+
+Go to [http://editor.swagger.io/#/] and File->Import File, select document/model.yaml
+
 ## To start
 
 Make sure you have `docker` and `docker-compose` installed

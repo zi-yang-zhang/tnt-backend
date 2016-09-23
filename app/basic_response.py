@@ -28,7 +28,7 @@ class InvalidRequestError(Exception):
 class DuplicateResourceCreationError(Exception):
     def __init__(self, name, resource_type):
         self.code = "E1004"
-        self.message = "Resource exists with name <" + name + "> for " + resource_type
+        self.message = "Resource exists with <" + name + "> for " + resource_type
 
 
 class InvalidIdUpdateRequestError(Exception):
@@ -57,10 +57,7 @@ class NotSupportedOperationError(Exception):
 
 class Response(object):
     def __init__(self, success, data=None):
-        if data is None:
-            self.data = {}
-        else:
-            self.data = data
+        self.data = data
         self.success = success
 
     def set_data(self, data):
@@ -68,6 +65,19 @@ class Response(object):
 
     def __str__(self):
         return json.dumps(self.__dict__)
+
+
+class MongoErrorResponse(Response):
+    def __init__(self, exception):
+        super(MongoErrorResponse, self).__init__(success=False)
+        self.errorCode = exception.code
+        self.exceptionMessage = str(exception.details)
+
+
+class InvalidRequestParamErrorResponse(Response):
+    def __init__(self, message):
+        super(InvalidRequestParamErrorResponse, self).__init__(success=False)
+        self.exceptionMessage = message
 
 
 class ErrorResponse(Response):

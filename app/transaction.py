@@ -1,14 +1,15 @@
 from authenticator import user_auth
-from bson.json_util import dumps
+from bson.errors import InvalidId
 from bson.objectid import ObjectId
-from flask import request, current_app, make_response
+from flask import request, current_app
 from flask_restful import Resource
 import utils
-from database import transaction_db as db
+from database import gym_db as db
+import json
 
 from basic_response import InvalidResourceStructureError, InvalidResourceParameterError, InvalidOperationError, \
-    InvalidRequestError, DuplicateResourceCreationError, InvalidIdUpdateRequestError, AttemptedToDeleteInUsedResource, \
-    AttemptedToAccessRestrictedResourceError, Response, ErrorResponse
+    InvalidRequestError, DuplicateResourceCreationError, InvalidIdUpdateRequestError,  \
+    AttemptedToAccessRestrictedResourceError, Response, ErrorResponse, NotSupportedOperationError
 
 
 class TransactionRecord(Resource):
@@ -19,5 +20,5 @@ class TransactionRecord(Resource):
             return Response(False, utils.bson_to_json(result)), 404
         return Response(True, utils.bson_to_json(result))
 
-    def put(self):
+    def post(self):
         pass
