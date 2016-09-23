@@ -14,7 +14,7 @@ paths:
     get:
       summary: Gym object that reprsend gym
       description: |
-        This endpoint return gym object bases on object id provided
+        This endpoint return gym object bases on query
       parameters:
         - name: id
           in: query
@@ -58,7 +58,7 @@ paths:
         - Gym
       responses:
         '200':
-          description: Gym with provided gym object_id
+          description: Gym that match the criteria
           schema:
             type: object
             properties:
@@ -83,9 +83,9 @@ paths:
           schema:
             $ref: '#/definitions/ErrorResponse'
     post:
-      summary: Gym object that reprsend gym
+      summary: Create gym object
       description: |
-        This endpoint return gym object bases on object id provided
+        This endpoint creates gym object record
       parameters:
         - name: Payload
           in: body
@@ -98,7 +98,7 @@ paths:
         - Gym
       responses:
         '201':
-          description: Gym with provided gym object_id
+          description: Gym created
           schema:
             type: object
             properties:
@@ -109,6 +109,185 @@ paths:
                 type: string
                 description: Id of the new created Gym record
             
+        '400':
+          description: Unexpected error
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        default:
+          description: Unexpected error
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+    put:
+      summary: Update Gym object
+      description: |
+        This endpoint udpates gym object record
+      parameters:
+        - name: Payload
+          in: body
+          description: Gym Object to be created
+          required: true
+          schema:
+            $ref: '#/definitions/UpdateGymPayload'
+        - name: Authorization
+          in: header
+          description: jwt for the gym
+          required: true
+          type: string
+
+      tags:
+        - Gym
+      responses:
+        '200':
+          description: Gym updated
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                description: If the request is succeed
+              data:
+                type: string
+                description: Id of the updated Gym record
+        '401':
+          description: Not authorized
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        '400':
+          description: Unexpected error
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        default:
+          description: Unexpected error
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+
+  /merchandise:
+    get:
+      summary: Merchandise object that reprsend merchandise
+      description: |
+        This endpoint return merchandise object bases on query
+      parameters:
+        - name: id
+          in: query
+          description: Mongo db object id of the merchandise object
+          type: string
+        - name: keyword
+          in: query
+          description: keyword for query
+          type: string
+        - name: owner
+          in: query
+          description: id of the gym that owns the merchandise
+          type: string
+        - name: find
+          in: query
+          type: integer
+          format: int32
+          description: number of result needed
+      tags:
+        - Merchandise
+      responses:
+        '200':
+          description: Merchandises that match the criteria
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                description: If the request is succeed
+              data:
+                type: array
+                items:
+                  $ref: '#/definitions/Merchandise'
+
+        '404':
+          description: Merchandises not found
+          schema:
+            type: object
+        '400':
+          description: Unexpected error
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        default:
+          description: Unexpected error
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+    post:
+      summary: Create merchandise object
+      description: |
+        This endpoint creates merchandise object record
+      parameters:
+        - name: Payload
+          in: body
+          description: merchandise Object to be created
+          required: true
+          schema:
+            $ref: '#/definitions/CreateMerchandisePayload'
+        - name: Authorization
+          in: header
+          description: jwt for the gym
+          required: true
+          type: string
+
+      tags:
+        - Merchandise
+      responses:
+        '201':
+          description: Merchandise created
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                description: If the request is succeed
+              data:
+                type: string
+                description: Id of the new created Merchandise record
+
+        '400':
+          description: Unexpected error
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        default:
+          description: Unexpected error
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+
+    put:
+      summary: Update Merchandise object
+      description: |
+        This endpoint udpates merchandise object record
+      parameters:
+        - name: Payload
+          in: body
+          description: Merchandise Object to be updated
+          required: true
+          schema:
+            $ref: '#/definitions/UpdateMerchandisePayload'
+        - name: Authorization
+          in: header
+          description: jwt for the gym
+          required: true
+          type: string
+
+      tags:
+        - Merchandise
+      responses:
+        '200':
+          description: Merchandise updated
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                description: If the request is succeed
+              data:
+                type: string
+                description: Id of the updated Merchandise record
+        '401':
+          description: Not authorized
+          schema:
+            $ref: '#/definitions/ErrorResponse'
         '400':
           description: Unexpected error
           schema:
@@ -154,6 +333,54 @@ definitions:
       detail:
         type: string
         description: Detail description of the gym
+
+  UpdateGymPayload:
+    type: object
+    required:
+    - id
+    properties:
+      id:
+        type: string
+        description: Mongo db Id
+      email:
+        type: string
+        description: email of gym
+      name:
+        type: string
+        description: Name of gym
+      address:
+        type: string
+        description: Address of gym
+      smallLogo:
+        type: string
+        description: Small logo URL of the gym
+      bigLogo:
+        type: string
+        description: Big logo URL of the gym
+      servies:
+        type: array
+        description: Services that the gym provides
+        items:
+          $ref: '#/definitions/Service'
+      detail:
+        type: string
+        description: Detail description of the gym
+      geoLocation:
+        type: array
+        description: coordinates of the location[longitude, latitude]
+        items:
+          type: number
+          format: double
+      announcements:
+        type: array
+        description: Announcements that the gym published
+        items:
+          $ref: '#/definitions/Announcement'
+      equipments:
+        type: array
+        description: Equipments that the gym provides
+        items:
+          $ref: '#/definitions/Equipment'
 
   Gym:
     type: object
@@ -323,6 +550,140 @@ definitions:
       date:
         type: string
         description: Time stamp of visit record
+  CreateMerchandisePayload:
+    type: object
+    required:
+    - type
+    - name
+    - detail
+    - owner
+    properties:
+      type:
+        type: integer
+        format: int32
+        description: 'type of the mechandise[1 for training classes, 2 for subscription]'
+      name:
+        type: string
+        description: Name of the merchandise
+      tag:
+        type: string
+        description: Category tag of the merchandise
+      count:
+        type: integer
+        format: int32
+        description: Usage count for the merchandise
+      detail:
+        type: string
+        description: Detail description of the merchandise
+      summary:
+        type: string
+        description: Summary description of the merchandise
+      owner:
+        type: string
+        description: Mongo db Id of the gym that owns the merchandise
+      price:
+        type: object
+        description: Price of the merchandise
+        properties:
+          amount:
+            type: number
+            format: double
+            description: Amount of the price
+          currency:
+            type: string
+            description: Currency of the price
+      expiryInfo:
+        type: object
+        properties:
+          startDate:
+            type: string
+            description: Date when merchandise is good to be used
+          expiryDate:
+            type: string
+            description: Date when merchandise is expired
+      schedule:
+        type: array
+        description: Schedule of when the merchandise is provided
+        items:
+          properties:
+            start:
+              type: string
+              description: Time when merchandise starts to be provided
+            end:
+              type: string
+              description: Time when merchandise stops to be provided
+      imageURLs:
+        type: array
+        description: Image URls for the merchandise
+        items:
+          type: string
+  UpdateMerchandisePayload:
+    type: object
+    required:
+    - id
+    properties:
+      id:
+        type: string
+        description: Mongo db Id
+      type:
+        type: integer
+        format: int32
+        description: 'type of the mechandise[1 for training classes, 2 for subscription]'
+      name:
+        type: string
+        description: Name of the merchandise
+      tag:
+        type: string
+        description: Category tag of the merchandise
+      count:
+        type: integer
+        format: int32
+        description: Usage count for the merchandise
+      detail:
+        type: string
+        description: Detail description of the merchandise
+      summary:
+        type: string
+        description: Summary description of the merchandise
+      owner:
+        type: string
+        description: Mongo db Id of the gym that owns the merchandise
+      price:
+        type: object
+        description: Price of the merchandise
+        properties:
+          amount:
+            type: number
+            format: double
+            description: Amount of the price
+          currency:
+            type: string
+            description: Currency of the price
+      expiryInfo:
+        type: object
+        properties:
+          startDate:
+            type: string
+            description: Date when merchandise is good to be used
+          expiryDate:
+            type: string
+            description: Date when merchandise is expired
+      schedule:
+        type: array
+        description: Schedule of when the merchandise is provided
+        items:
+          properties:
+            start:
+              type: string
+              description: Time when merchandise starts to be provided
+            end:
+              type: string
+              description: Time when merchandise stops to be provided
+      imageURLs:
+        type: array
+        description: Image URls for the merchandise
+        items:
+          type: string
   Merchandise:
     type: object
     properties:
