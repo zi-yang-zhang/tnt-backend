@@ -24,3 +24,9 @@ def bson_to_json(bson_string):
 class InvalidQueryOperatorError(Exception):
     def __init__(self, query):
         self.message = "Invalid query operation: " + str(query)
+
+
+def non_empty_str(string):
+    if string == "":
+        raise ValueError("This string cannot be empty")
+    return string

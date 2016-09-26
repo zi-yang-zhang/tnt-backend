@@ -7,8 +7,8 @@ from flask_httpauth import HTTPTokenAuth
 from flask_restful import Resource
 from jose import jwt, JWTError
 from passlib.hash import sha256_crypt
-import requests
 
+from database import USER_LEVEL
 from database import admin_db as db
 
 admin_token_auth = HTTPTokenAuth(scheme='tnt-admin-auth-scheme', realm='admin')
@@ -16,8 +16,6 @@ resource_access_auth = HTTPTokenAuth(scheme='Bearer', realm='resource')
 user_auth = HTTPTokenAuth(scheme='Bearer', realm='user')
 
 SESSION_TIMEOUT = 2628000
-
-USER_LEVEL = {'DBA': 0, 'SystemAdmin': 1, 'Admin': 2, 'PowerUser': 3, 'User': 4, 'Guest': 5}
 
 
 @admin_token_auth.verify_token

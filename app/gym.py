@@ -1,22 +1,19 @@
-from jose import jwt
+import json
+from calendar import timegm
+from datetime import datetime
 
-from authenticator import user_auth
 from bson.errors import InvalidId
 from bson.objectid import ObjectId
 from flask import request, current_app
 from flask_restful import Resource, reqparse
-from database import gym_db as db
-import json
+from jose import jwt
 
+from utils import non_empty_str
+from authenticator import user_auth
 from basic_response import InvalidResourceStructureError, InvalidResourceParameterError, \
     InvalidRequestError, DuplicateResourceCreationError, InvalidIdUpdateRequestError,  \
     AttemptedToAccessRestrictedResourceError, Response, NotSupportedOperationError
-
-
-def non_empty_str(string):
-    if string == "":
-        raise ValueError("This string cannot be empty")
-    return string
+from database import gym_db as db, USER_LEVEL
 
 
 def merchandise_price(price):
@@ -237,8 +234,6 @@ class Gym(Resource):
                     data.update({'announcements': []})
                 if data.get('equipments') is None:
                     data.update({'equipments': []})
-                del data['password']
-                del data['email']
                 data.update({'geoLocation': data.get('geoLocation').get('coordinates')})
             return data
 
@@ -254,14 +249,27 @@ class Gym(Resource):
         args = parser.parse_args()
         limit = args['find'] if args['find'] is not None else 0
         results = []
+        projection = {'password': 0}
         query = None
         if args['id'] is not None:
             query = {"_id": ObjectId(args['id'])}
-        if args['email'] is not None:
+            if request.headers['Authorization'] is not None:
+                auth_type, token = request.headers['Authorization'].split(None, 1)
+                claim = jwt.decode(token=token, key=current_app.secret_key, algorithms='HS256',
+                                   options={'verify_exp': False})
+                gym_email = claim.get('user')
+                request_gym = db.gym.find_one(filter={"email": gym_email})
+                if request_gym.get('_id') != ObjectId(args['id']):
+                    projection['email'] = 0
+            else:
+                projection['email'] = 0
+        elif args['email'] is not None:
             query = {'email': args['email']}
-        if args['address'] is not None:
+        elif args['address'] is not None:
+            projection['email'] = 0
             query = {"address": {"$regex": ".*{}.*".format(args['address'].encode('utf-8'))}}
-        if args['coordinates'] is not None:
+        elif args['coordinates'] is not None:
+            projection['email'] = 0
             coordinates = [float(i) for i in args['coordinates'].split(',')]
             if len(coordinates) != 2:
                 raise InvalidResourceStructureError('coordinates', 'gym query')
@@ -271,13 +279,14 @@ class Gym(Resource):
             if args['min'] is not None and args['min'] > 0:
                 near_target['$minDistance'] = args['min']
             query = {'geoLocation': {'$near': near_target}}
-        if args['keyword'] is not None:
+        elif args['keyword'] is not None:
+            projection['email'] = 0
             subquery = [{"name": {"$regex": ".*{}.*".format(args['keyword'].encode('utf-8'))}},
                         {"address": {"$regex": ".*{}.*".format(args['keyword'].encode('utf-8'))}},
                         {"detail": {"$regex": ".*{}.*".format(args['keyword'].encode('utf-8'))}}]
             query = {"$or": subquery}
 
-        raw_results = db.gym.find(filter=query, limit=limit)
+        raw_results = db.gym.find(filter=query, limit=limit, projection=projection)
         for result in raw_results:
             results.append(sanitize_gym_return_data(result))
         current_app.logger.info('response sent %s', str(Response(success=True, data=results)))
@@ -388,14 +397,6 @@ class Gym(Resource):
             parser.add_argument('detail', help='detail description of gym')
             args = parser.parse_args()
             coordinates = args['geoLocation']
-            if args['email'] == "":
-                raise InvalidResourceStructureError('email', 'Gym')
-            if args['password'] == "":
-                raise InvalidResourceStructureError('password', 'Gym')
-            if args['name'] == "":
-                raise InvalidResourceStructureError('name', 'Gym')
-            if args['address'] == "":
-                raise InvalidResourceStructureError('address', 'Gym')
             if len(coordinates) != 2:
                 raise InvalidResourceStructureError('geoLocation', 'gym creation')
             args.update({'geoLocation': {'type': "Point", 'coordinates': coordinates}})
@@ -406,5 +407,11 @@ class Gym(Resource):
 
         parser = reqparse.RequestParser()
         new_id = db.gym.insert_one(validate_gym_entry_data_for_creation()).inserted_id
-        return json.loads(str(Response(success=True, data=str(new_id)))), 201
+        new_gym = db.gym.find_one({'_id': ObjectId(new_id)})
+
+        issued_time = timegm(datetime.utcnow().utctimetuple())
+        claims = {'iat': issued_time, 'user': new_gym['email'],
+                  'level': USER_LEVEL['User']}
+        jwt_token = str(jwt.encode(claims=claims, key=current_app.secret_key, algorithm='HS256'))
+        return json.loads(str(Response(success=True, data={'jwt': jwt_token, 'id': str(new_id)}))), 201
 

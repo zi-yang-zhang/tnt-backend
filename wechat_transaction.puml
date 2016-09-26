@@ -1,8 +1,9 @@
 @startuml
 actor user
 user -> app: request to buy
-app -> backend: /api/perform_transaction[userId, gymId, merchandiseId, merchandiseType, paymentType:wechat]
-backend ->DB: search for merchandise(merchandiseType, merchandiseId)
+app -> backend: /api/perform_transaction[userId, gymId, merchandiseId, paymentType:wechat]
+backend ->DB: search for merchandise(merchandiseId)
+alt merchandise exists
 DB --> backend: merchandise object
 backend -> wechatPaymentAPI: request payment
 wechatPaymentAPI --> backend: prepay_id
@@ -27,5 +28,15 @@ backend -> DB: delete transaction object[transaction_id]
 backend --> app: deleted
 app -> app: canceled transaction
 end
+else merchandise not exists
+backend -> app: Error Merchandise not found
+else user not exists
+backend -> app: Error User not found
+else gym not exists
+backend -> app: Error Gym not found
+else paymentType not supported
+backend -> app: Error paymentType not supported
+end
+
 
 @enduml

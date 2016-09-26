@@ -17,3 +17,6 @@ def initialize():
     admin_db.set_profiling_level(level=ALL)
     gym_db.set_profiling_level(level=ALL)
     gym_db.gym.create_index([("geoLocation", GEOSPHERE)], background=True)
+
+
+USER_LEVEL = {'DBA': 0, 'SystemAdmin': 1, 'Admin': 2, 'PowerUser': 3, 'User': 4, 'Guest': 5}

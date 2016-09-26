@@ -10,6 +10,9 @@ from flask import Flask
 from pymongo.errors import WriteError
 import ast
 
+from user import DuplicatedUserEmail, DuplicatedUsername
+from transaction_engine.exception import TransactionGymNotFound, TransactionMerchandiseNotFound, TransactionPaymentTypeNotSupported, TransactionUserNotFound
+
 from basic_response import DuplicateResourceCreationError, InvalidRequestError, MongoErrorResponse, \
     InvalidResourceStructureError, InvalidResourceParameterError, InvalidIdUpdateRequestError, \
     AttemptedToAccessRestrictedResourceError, InvalidRequestParamErrorResponse
@@ -29,36 +32,36 @@ with app.app_context():
     database.initialize()
 
 
-@app.route('/')
-def index():
-    access_token = request.cookies.get('jwt')
-    logger.info("access_token %s", access_token)
-    if access_token is not None:
-        try:
-            jwt.decode(token=access_token, key=app.secret_key, algorithms='HS256')
-            return make_response(redirect('/dashboard'))
-        except JWTError as e:
-            logger.info("jwt not verified: %s", type(e).__name__)
-            return send_from_directory('template', 'login.html')
-    else:
-        return send_from_directory('template', 'login.html')
-
-
-@app.route('/dashboard/', defaults={'path': ''})
-@app.route('/dashboard', defaults={'path': ''})
-@app.route('/dashboard/<path:path>')
-def dashboard(path):
-    access_token = request.cookies.get('jwt')
-    logger.debug("access_token %s", access_token)
-    if access_token is not None:
-        try:
-            jwt.decode(token=access_token, key=app.secret_key, algorithms='HS256')
-            return send_from_directory('template', 'app.html')
-        except JWTError as e:
-            logger.info("jwt not verified: %s", type(e).__name__)
-            return make_response(redirect('/'))
-    else:
-        return make_response(redirect('/'))
+# @app.route('/')
+# def index():
+#     access_token = request.cookies.get('jwt')
+#     logger.info("access_token %s", access_token)
+#     if access_token is not None:
+#         try:
+#             jwt.decode(token=access_token, key=app.secret_key, algorithms='HS256')
+#             return make_response(redirect('/dashboard'))
+#         except JWTError as e:
+#             logger.info("jwt not verified: %s", type(e).__name__)
+#             return send_from_directory('template', 'login.html')
+#     else:
+#         return send_from_directory('template', 'login.html')
+#
+#
+# @app.route('/dashboard/', defaults={'path': ''})
+# @app.route('/dashboard', defaults={'path': ''})
+# @app.route('/dashboard/<path:path>')
+# def dashboard(path):
+#     access_token = request.cookies.get('jwt')
+#     logger.debug("access_token %s", access_token)
+#     if access_token is not None:
+#         try:
+#             jwt.decode(token=access_token, key=app.secret_key, algorithms='HS256')
+#             return send_from_directory('template', 'app.html')
+#         except JWTError as e:
+#             logger.info("jwt not verified: %s", type(e).__name__)
+#             return make_response(redirect('/'))
+#     else:
+#         return make_response(redirect('/'))
 
 
 @app.after_request
@@ -140,3 +143,44 @@ def handle_invalid_usage(error):
     response.status_code = 400
     return response
 
+
+@app.errorhandler(TransactionMerchandiseNotFound)
+def handle_invalid_usage(error):
+    response = jsonify(ErrorResponse(error).__dict__)
+    response.status_code = 400
+    return response
+
+
+@app.errorhandler(TransactionUserNotFound)
+def handle_invalid_usage(error):
+    response = jsonify(ErrorResponse(error).__dict__)
+    response.status_code = 400
+    return response
+
+
+@app.errorhandler(TransactionGymNotFound)
+def handle_invalid_usage(error):
+    response = jsonify(ErrorResponse(error).__dict__)
+    response.status_code = 400
+    return response
+
+
+@app.errorhandler(TransactionPaymentTypeNotSupported)
+def handle_invalid_usage(error):
+    response = jsonify(ErrorResponse(error).__dict__)
+    response.status_code = 400
+    return response
+
+
+@app.errorhandler(DuplicatedUserEmail)
+def handle_invalid_usage(error):
+    response = jsonify(ErrorResponse(error).__dict__)
+    response.status_code = 400
+    return response
+
+
+@app.errorhandler(DuplicatedUsername)
+def handle_invalid_usage(error):
+    response = jsonify(ErrorResponse(error).__dict__)
+    response.status_code = 400
+    return response
