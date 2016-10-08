@@ -54,17 +54,17 @@ class User(Resource):
         args = parser.parse_args()
         limit = args['find'] if args['find'] is not None else 0
         results = []
-        projection = {'password': 0}
+        projection = {'authMethod': 0}
         query = None
         if args['id'] is not None:
             query = {"_id": ObjectId(args['id'])}
-            if request.headers['Authorization'] is not None:
+            if request.headers.get('Authorization') is not None:
                 auth_type, token = request.headers['Authorization'].split(None, 1)
                 claim = jwt.decode(token=token, key=current_app.secret_key, algorithms='HS256',
                                    options={'verify_exp': False})
                 user_email = claim.get('user')
                 request_user = db.user.find_one(filter={"email": user_email})
-                if request_user.get('_id') != ObjectId(args['id']):
+                if request_user is not None and request_user.get('_id') != ObjectId(args['id']):
                     projection['email'] = 0
             else:
                 projection['email'] = 0
@@ -181,13 +181,13 @@ class User(Resource):
             parser.add_argument('username', required=True, trim=True, type=non_empty_str, nullable=False)
             parser.add_argument('email', required=True, trim=True, type=non_empty_str, nullable=False)
             parser.add_argument('password', required=True, type=non_empty_str, nullable=False)
-            parser.add_argument('firstName', type=non_empty_str, nullable=False)
-            parser.add_argument('lastName', type=non_empty_str, nullable=False)
-            parser.add_argument('age', type=int, nullable=False)
-            parser.add_argument('gender', type=int, choices=(1, 2, 3), nullable=False)
+            parser.add_argument('firstName', type=non_empty_str, nullable=False, default="")
+            parser.add_argument('lastName', type=non_empty_str, nullable=False, default="")
+            parser.add_argument('age', type=int, nullable=False, default=-1)
+            parser.add_argument('gender', type=int, choices=(1, 2, 3), nullable=False, default=3)
             args = parser.parse_args()
             duplicate_email = db.user.find_one({"email": args['email']})
-            duplicate_username = db.user.find_one({"email": args['username']})
+            duplicate_username = db.user.find_one({"username": args['username']})
             if duplicate_email is not None:
                 raise DuplicatedUserEmail(args['email'])
             if duplicate_username is not None:

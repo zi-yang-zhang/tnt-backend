@@ -253,13 +253,13 @@ class Gym(Resource):
         query = None
         if args['id'] is not None:
             query = {"_id": ObjectId(args['id'])}
-            if request.headers['Authorization'] is not None:
+            if request.headers.get('Authorization') is not None:
                 auth_type, token = request.headers['Authorization'].split(None, 1)
                 claim = jwt.decode(token=token, key=current_app.secret_key, algorithms='HS256',
                                    options={'verify_exp': False})
                 gym_email = claim.get('user')
                 request_gym = db.gym.find_one(filter={"email": gym_email})
-                if request_gym.get('_id') != ObjectId(args['id']):
+                if request_gym is not None and request_gym.get('_id') != ObjectId(args['id']):
                     projection['email'] = 0
             else:
                 projection['email'] = 0
@@ -299,6 +299,8 @@ class Gym(Resource):
         def validate_announcement_entry_data(data=None):
             if data is None:
                 raise InvalidRequestError('announcement')
+            if data.get('title') is None:
+                raise InvalidResourceStructureError('title', 'announcement')
             if (data.get('content') is None or data.get('content') == "") and (
                     data.get('imageURLs') is None or data.get('imageURLs').__len__() == 0):
                 raise InvalidResourceStructureError('content', 'announcement')

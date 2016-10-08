@@ -1,5 +1,6 @@
 import model
 import gym
+import user
 from authenticator import AdminAuthToken, WechatAuthToken
 from flask import Blueprint
 from flask_restful import Api
@@ -18,6 +19,7 @@ router.add_resource(AdminAuthToken, '/api/auth/')
 router.add_resource(WechatAuthToken, '/api/wechat_auth')
 router.add_resource(gym.Gym, '/api/gym/')
 router.add_resource(gym.Merchandise, '/api/merchandise/')
+router.add_resource(user.User, '/api/user/')
 
 
 
