@@ -1,20 +1,15 @@
 from calendar import timegm
 from datetime import datetime
 
-from flask import json
-from jose import jwt
-
-from authenticator import user_auth
-from bson.json_util import dumps
 from bson.objectid import ObjectId
+from flask import json
 from flask import request, current_app
 from flask_restful import Resource, reqparse
-from utils import non_empty_str
-from database import user_db as db, USER_LEVEL
+from jose import jwt
 
-from basic_response import InvalidResourceStructureError, InvalidResourceParameterError, InvalidOperationError, \
-    InvalidRequestError, DuplicateResourceCreationError, InvalidIdUpdateRequestError, AttemptedToDeleteInUsedResource, \
-    AttemptedToAccessRestrictedResourceError, Response, ErrorResponse
+from basic_response import Response
+from database import user_db as db, USER_LEVEL
+from utils import non_empty_str
 
 GENDER = {1: 'male', 2: 'female', 3: 'unknown'}
 

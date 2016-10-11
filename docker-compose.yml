@@ -9,6 +9,7 @@ ngnix:
     - "80:80"
 
 app:
+
   restart: always
   build: ./app
   ports:
@@ -18,7 +19,7 @@ app:
   volumes:
     - ./app:/app
     - ../log:/tmp/log
-  dockerfile: Dockerfile
+  dockerfile: /DockerFiles/prod/Dockerfile
 
 
 mongo:

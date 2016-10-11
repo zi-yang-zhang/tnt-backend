@@ -8,11 +8,10 @@ from flask import request, current_app
 from flask_restful import Resource, reqparse
 from jose import jwt
 
+import exception
+from basic_response import Response
 from utils import non_empty_str
 from authenticator import user_auth
-from basic_response import InvalidResourceStructureError, InvalidResourceParameterError, \
-    InvalidRequestError, DuplicateResourceCreationError, InvalidIdUpdateRequestError,  \
-    AttemptedToAccessRestrictedResourceError, Response, NotSupportedOperationError
 from database import gym_db as db, USER_LEVEL
 
 
@@ -110,11 +109,11 @@ class Merchandise(Resource):
                 try:
                     owner = db.gym.find_one({"_id": ObjectId(gym_id)})
                 except TypeError:
-                    raise InvalidResourceParameterError('owner', 'Merchandise')
+                    raise exception.InvalidResourceParameterError('owner', 'Merchandise')
                 except InvalidId:
-                    raise InvalidResourceParameterError('owner', 'Merchandise')
+                    raise exception.InvalidResourceParameterError('owner', 'Merchandise')
                 if owner is None:
-                    raise InvalidResourceParameterError('owner', 'Merchandise')
+                    raise exception.InvalidResourceParameterError('owner', 'Merchandise')
                 else:
                     set_target['owner'] = owner.get("_id")
             if args['price'] is not None:
@@ -162,7 +161,7 @@ class Merchandise(Resource):
         update_query = generate_update_merchandise_command()
         result = db.merchandise.update_one({"_id": ObjectId(id_to_update)}, update_query)
         if result.matched_count == 0:
-            raise InvalidIdUpdateRequestError('Merchandise', args['_id'])
+            raise exception.InvalidIdUpdateRequestError('Merchandise', args['_id'])
         return json.loads(str(Response(success=True, data=str(result.upserted_id))))
 
     # @user_auth.login_required
@@ -184,7 +183,7 @@ class Merchandise(Resource):
             gym_id = args['owner']
             owner = db.gym.find_one({"_id": ObjectId(gym_id)})
             if owner is None:
-                raise InvalidResourceParameterError('owner', 'Merchandise')
+                raise exception.InvalidResourceParameterError('owner', 'Merchandise')
             else:
                 args.update({'owner': ObjectId(gym_id)})
             return args
@@ -211,9 +210,9 @@ class Merchandise(Resource):
         gym = db.gym.find_one(filter={"email": gym_email})
         merchandise = db.merchandise.find_one(filter={"_id": ObjectId(id_to_validate)})
         if gym is None:
-            raise AttemptedToAccessRestrictedResourceError("Merchandise")
+            raise exception.AttemptedToAccessRestrictedResourceError("Merchandise")
         elif merchandise is not None and ObjectId(merchandise.get('owner')) != gym.get('_id'):
-            raise AttemptedToAccessRestrictedResourceError("Merchandise")
+            raise exception.AttemptedToAccessRestrictedResourceError("Merchandise")
 
 
 class Gym(Resource):
@@ -272,7 +271,7 @@ class Gym(Resource):
             projection['email'] = 0
             coordinates = [float(i) for i in args['coordinates'].split(',')]
             if len(coordinates) != 2:
-                raise InvalidResourceStructureError('coordinates', 'gym query')
+                raise exception.InvalidResourceStructureError('coordinates', 'gym query')
             near_target = {'$geometry': {'type': "Point", 'coordinates': coordinates}}
             if args['max'] is not None and args['max'] > 0:
                 near_target['$maxDistance'] = args['max']
@@ -298,19 +297,19 @@ class Gym(Resource):
     def put(self):
         def validate_announcement_entry_data(data=None):
             if data is None:
-                raise InvalidRequestError('announcement')
+                raise exception.InvalidRequestError('announcement')
             if data.get('title') is None:
-                raise InvalidResourceStructureError('title', 'announcement')
+                raise exception.InvalidResourceStructureError('title', 'announcement')
             if (data.get('content') is None or data.get('content') == "") and (
                     data.get('imageURLs') is None or data.get('imageURLs').__len__() == 0):
-                raise InvalidResourceStructureError('content', 'announcement')
+                raise exception.InvalidResourceStructureError('content', 'announcement')
             if data.get('scope') is None or data.get('scope') > 2 or data.get('scope') < 1:
-                raise InvalidResourceStructureError('scope', 'announcement')
+                raise exception.InvalidResourceStructureError('scope', 'announcement')
             if data.get('actionType') is not None and data.get('actionType') != "":
                 if data.get('actionType').get('type') is None or data.get('actionType').get('type') == "":
-                    raise InvalidResourceStructureError('actionType', 'announcement')
+                    raise exception.InvalidResourceStructureError('actionType', 'announcement')
                 if data.get('actionType').get('content') is None or data.get('actionType').get('type') == "":
-                    raise InvalidResourceStructureError('actionType', 'announcement')
+                    raise exception.InvalidResourceStructureError('actionType', 'announcement')
             return data
 
         def generate_update_gym_command():
@@ -319,14 +318,14 @@ class Gym(Resource):
             if args['email'] is not None:
                 set_target['email'] = args['email']
             if args['password'] is not None:
-                raise NotSupportedOperationError('update password', 'Gym')
+                raise exception.NotSupportedOperationError('update password', 'Gym')
             if args['name'] is not None:
                 set_target['name'] = args['name']
             if args['address'] is not None:
                 set_target['address'] = args['address']
             if args['geoLocation'] is not None:
                 if len(args['geoLocation']) != 2:
-                    raise InvalidResourceStructureError('geoLocation', 'Gym update')
+                    raise exception.InvalidResourceStructureError('geoLocation', 'Gym update')
                 else:
                     set_target['geoLocation'] = args['geoLocation']
             if args['smallLogo'] is not None:
@@ -339,7 +338,7 @@ class Gym(Resource):
 
             if args['service'] is not None:
                 if not isinstance(args['service'], list):
-                    raise InvalidResourceParameterError('service', 'Gym')
+                    raise exception.InvalidResourceParameterError('service', 'Gym')
                 elif len(args['service']) > 0:
                     if '$push' not in command:
                         command['$push'] = {}
@@ -361,9 +360,9 @@ class Gym(Resource):
             request_gym = db.gym.find_one(filter={"email": gym_email})
 
             if request_gym is None:
-                raise AttemptedToAccessRestrictedResourceError("Gym")
+                raise exception.AttemptedToAccessRestrictedResourceError("Gym")
             elif request_gym.get('_id') != ObjectId(id_to_update):
-                raise AttemptedToAccessRestrictedResourceError("Gym")
+                raise exception.AttemptedToAccessRestrictedResourceError("Gym")
 
         parser = reqparse.RequestParser()
         parser.add_argument('_id', required=True)
@@ -384,7 +383,7 @@ class Gym(Resource):
         update_query = generate_update_gym_command()
         result = db.gym.update_one({"_id": ObjectId(id_to_update)}, update_query)
         if result.matched_count == 0:
-            raise InvalidIdUpdateRequestError('Gym', id_to_update)
+            raise exception.InvalidIdUpdateRequestError('Gym', id_to_update)
         return json.loads(str(Response(success=True, data=str(result.upserted_id))))
 
     def post(self):
@@ -400,11 +399,11 @@ class Gym(Resource):
             args = parser.parse_args()
             coordinates = args['geoLocation']
             if len(coordinates) != 2:
-                raise InvalidResourceStructureError('geoLocation', 'gym creation')
+                raise exception.InvalidResourceStructureError('geoLocation', 'gym creation')
             args.update({'geoLocation': {'type': "Point", 'coordinates': coordinates}})
             duplicate = db.gym.find_one({"email": args['email']})
             if duplicate is not None:
-                raise DuplicateResourceCreationError(args['email'], 'Gym')
+                raise exception.DuplicateResourceCreationError(args['email'], 'Gym')
             return args
 
         parser = reqparse.RequestParser()
