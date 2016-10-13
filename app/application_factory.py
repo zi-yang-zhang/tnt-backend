@@ -6,15 +6,17 @@ from logging.config import fileConfig
 from bson.errors import InvalidId
 from flask import Flask
 from flask import jsonify
+from jose import JWTError
 from pymongo.errors import WriteError
 
 import exception
-from basic_response import InvalidRequestParamErrorResponse, MongoErrorResponse, ErrorResponse
+from basic_response import InvalidRequestParamErrorResponse, MongoErrorResponse, ErrorResponse, Response
 from user import DuplicatedUserEmail, DuplicatedUsername
 
 
 def create_app():
     application = Flask('tnt-core', static_folder='./static')
+
     # Resource errors
 
     @application.errorhandler(exception.DuplicateResourceCreationError)
@@ -83,10 +85,34 @@ def create_app():
         response.status_code = 404
         return response
 
+    @application.errorhandler(exception.TransactionRecordInvalidState)
+    def handle_invalid_usage(error):
+        response = jsonify(ErrorResponse(error).__dict__)
+        response.status_code = 400
+        return response
+
+    @application.errorhandler(exception.TransactionRecordExpired)
+    def handle_invalid_usage(error):
+        response = jsonify(ErrorResponse(error).__dict__)
+        response.status_code = 200
+        return response
+
+    @application.errorhandler(exception.TransactionRecordCountUsedUp)
+    def handle_invalid_usage(error):
+        response = jsonify(ErrorResponse(error).__dict__)
+        response.status_code = 200
+        return response
+
     @application.errorhandler(exception.TransactionGymNotFound)
     def handle_invalid_usage(error):
         response = jsonify(ErrorResponse(error).__dict__)
         response.status_code = 404
+        return response
+
+    @application.errorhandler(JWTError)
+    def handle_invalid_usage(error):
+        response = jsonify(ErrorResponse(error).__dict__)
+        response.status_code = 401
         return response
 
     @application.errorhandler(exception.TransactionPaymentTypeNotSupported)
@@ -146,7 +172,11 @@ def add_header(r):
     try:
         payload = json.loads(r.get_data())
         if payload.get('message') is not None:
-            r.set_data(InvalidRequestParamErrorResponse(payload.get('message')))
+            if 'Authorization' in payload.get('message'):
+                r.status_code = 401
+                r.set_data(Response(success=False, exceptionMessage=payload.get('message').get('Authorization')))
+            else:
+                r.set_data(InvalidRequestParamErrorResponse(payload.get('message')))
     except Exception:
         pass
     return r

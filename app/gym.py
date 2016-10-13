@@ -14,6 +14,8 @@ from utils import non_empty_str
 from authenticator import user_auth
 from database import gym_db as db, USER_LEVEL
 
+EXPIRY_INFO_TYPE = {"by_count": 1, "by_duration": 2}
+
 
 def merchandise_price(price):
     if price is None or price == "":
@@ -27,10 +29,17 @@ def merchandise_price(price):
 def merchandise_expiry_info(expiry_info):
     if expiry_info is None or expiry_info == "":
         return {'startDate': "", 'expiryDate': ""}
-    elif expiry_info.get('startDate') is None or expiry_info.get('expiryDate') is None:
+    elif expiry_info.get('type') is None or not isinstance(expiry_info.get('type'), int) or expiry_info.get(
+            'type') < 0 or expiry_info.get('type') > 2:
         raise ValueError('ExpiryInfo is not well formatted')
     else:
-        return expiry_info
+        if expiry_info.get('type') == EXPIRY_INFO_TYPE["by_count"] and expiry_info.get(
+                'startDate') is not None and expiry_info.get('expiryDate') is not None:
+            return expiry_info
+        elif expiry_info.get('type') == EXPIRY_INFO_TYPE["by_duration"] and expiry_info.get('duration') is not None:
+            return expiry_info
+        else:
+            raise ValueError('ExpiryInfo is not well formatted')
 
 
 def merchandise_schedule(schedule):
@@ -43,7 +52,6 @@ def merchandise_schedule(schedule):
 
 
 class Merchandise(Resource):
-
     def get(self):
         def sanitize_merchandise_return_data(data=None):
             if data is not None:
@@ -99,11 +107,11 @@ class Merchandise(Resource):
             command = {}
             set_target = {}
             if args['type'] is not None:
-                    set_target['type'] = args['type']
+                set_target['type'] = args['type']
             if args['name'] is not None:
-                    set_target['name'] = args['name']
+                set_target['name'] = args['name']
             if args['detail'] is not None:
-                    set_target['detail'] = args['detail']
+                set_target['detail'] = args['detail']
             if args['owner'] is not None:
                 gym_id = args['owner']
                 try:
@@ -117,22 +125,20 @@ class Merchandise(Resource):
                 else:
                     set_target['owner'] = owner.get("_id")
             if args['price'] is not None:
-                set_target['price'] = args['price']
-            if args['count'] is not None:
-                set_target['count'] = args['count']
+                set_target['price'] = merchandise_price(args['price'])
             if args['summary'] is not None:
                 set_target['summary'] = args['summary']
             if args['tag'] is not None:
                 set_target['tag'] = args['tag']
             if args['expiryInfo'] is not None:
-                set_target['expiryInfo'] = args['expiryInfo']
+                set_target['expiryInfo'] = merchandise_expiry_info(args['expiryInfo'])
             command['$set'] = set_target
 
             if args['schedule'] is not None:
                 if len(args['schedule']) > 0:
                     if '$push' not in command:
                         command['$push'] = {}
-                    command['$push']['schedule'] = {'$each': args['schedule']}
+                    command['$push']['schedule'] = {'$each': merchandise_schedule(args['schedule'])}
 
             if args['imageURLs'] is not None:
                 if len(args['imageURLs']) > 0:
@@ -147,11 +153,10 @@ class Merchandise(Resource):
         parser.add_argument('name', type=non_empty_str, nullable=False)
         parser.add_argument('detail', type=non_empty_str, nullable=False)
         parser.add_argument('owner', type=non_empty_str, nullable=False)
+        parser.add_argument('expiryInfo', type=merchandise_expiry_info, nullable=False)
         parser.add_argument('tag', default="")
-        parser.add_argument('count', type=int, default=-1, nullable=False)
         parser.add_argument('summary', default="")
         parser.add_argument('price', default={'amount': 0, 'currency': "CNY"}, type=merchandise_price)
-        parser.add_argument('expiryInfo', default={'startDate': "", 'expiryDate': ""}, type=merchandise_expiry_info)
         parser.add_argument('schedule', type=merchandise_schedule, default=[], action='append')
         parser.add_argument('imageURLs', action='append', default=[])
 
@@ -171,11 +176,10 @@ class Merchandise(Resource):
             parser.add_argument('name', required=True, type=non_empty_str, nullable=False)
             parser.add_argument('detail', required=True, type=non_empty_str, nullable=False)
             parser.add_argument('owner', required=True, type=non_empty_str, nullable=False)
+            parser.add_argument('expiryInfo', required=True, type=merchandise_expiry_info, nullable=False)
             parser.add_argument('tag', default="")
-            parser.add_argument('count', type=int, default=-1, nullable=False)
             parser.add_argument('summary', default="")
             parser.add_argument('price', default={'amount': 0, 'currency': "CNY"}, type=merchandise_price)
-            parser.add_argument('expiryInfo', default={'startDate': "", 'expiryDate': ""}, type=merchandise_expiry_info)
             parser.add_argument('schedule', type=merchandise_schedule, default=[], action='append')
             parser.add_argument('imageURLs', action='append', default=[])
 
@@ -216,7 +220,6 @@ class Merchandise(Resource):
 
 
 class Gym(Resource):
-
     def get(self):
         def sanitize_gym_return_data(data=None):
             if data is not None:
@@ -301,7 +304,7 @@ class Gym(Resource):
             if data.get('title') is None:
                 raise exception.InvalidResourceStructureError('title', 'announcement')
             if (data.get('content') is None or data.get('content') == "") and (
-                    data.get('imageURLs') is None or data.get('imageURLs').__len__() == 0):
+                            data.get('imageURLs') is None or data.get('imageURLs').__len__() == 0):
                 raise exception.InvalidResourceStructureError('content', 'announcement')
             if data.get('scope') is None or data.get('scope') > 2 or data.get('scope') < 1:
                 raise exception.InvalidResourceStructureError('scope', 'announcement')
@@ -345,7 +348,8 @@ class Gym(Resource):
                     command['$push']['service'] = {'$each': args['service']}
 
             if args['announcements'] is not None:
-                announcements = [validate_announcement_entry_data(announcement) for announcement in args['announcements']]
+                announcements = [validate_announcement_entry_data(announcement) for announcement in
+                                 args['announcements']]
                 if '$push' not in command:
                     command['$push'] = {}
                 command['$push']['announcements'] = {'$each': announcements}
@@ -415,4 +419,3 @@ class Gym(Resource):
                   'level': USER_LEVEL['User']}
         jwt_token = str(jwt.encode(claims=claims, key=current_app.secret_key, algorithm='HS256'))
         return json.loads(str(Response(success=True, data={'jwt': jwt_token, 'id': str(new_id)}))), 201
-

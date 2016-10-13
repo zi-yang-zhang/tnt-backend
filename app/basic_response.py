@@ -2,9 +2,10 @@ import json
 
 
 class Response(object):
-    def __init__(self, success, data=None):
+    def __init__(self, success, data=None, exceptionMessage=None):
         self.data = data
         self.success = success
+        self.exceptionMessage = exceptionMessage
 
     def set_data(self, data):
         self.data = data

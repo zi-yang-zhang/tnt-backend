@@ -30,6 +30,24 @@ class TransactionRecordNotFound(Exception):
         self.message = "Error Transaction record not found: " + transaction_record_id
 
 
+class TransactionRecordInvalidState(Exception):
+    def __init__(self, transaction_record_id, state):
+        self.code = "TX1005"
+        self.message = "Error Transaction record {} with invalid state:{} ".format(transaction_record_id, state)
+
+
+class TransactionRecordExpired(Exception):
+    def __init__(self, transaction_record_id):
+        self.code = "TX1006"
+        self.message = "Error Transaction record {} expired".format(transaction_record_id)
+
+
+class TransactionRecordCountUsedUp(Exception):
+    def __init__(self, transaction_record_id):
+        self.code = "TX1007"
+        self.message = "Error Transaction record {} count is used up".format(transaction_record_id)
+
+
 class InvalidResourceStructureError(Exception):
     def __init__(self, param, resource_type):
         self.code = "E1000"
@@ -82,3 +100,9 @@ class NotSupportedOperationError(Exception):
     def __init__(self, operation, resources):
         self.code = "E1008"
         self.message = operation + " is not supported for " + str(resources)
+
+
+class InvalidAuthHeaderException(Exception):
+    def __init__(self, message):
+        self.code = "A1000"
+        self.message = message
