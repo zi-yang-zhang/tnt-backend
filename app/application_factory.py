@@ -115,7 +115,7 @@ def create_app():
         response.status_code = 401
         return response
 
-    @application.errorhandler(exception.TransactionPaymentTypeNotSupported)
+    @application.errorhandler(exception.TransactionPaymentMethodNotSupported)
     def handle_invalid_usage(error):
         response = jsonify(ErrorResponse(error).__dict__)
         response.status_code = 400

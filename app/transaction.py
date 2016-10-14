@@ -10,13 +10,13 @@ from jose import jwt
 
 from basic_response import Response
 from database import transaction_db, gym_db, user_db
-from exception import TransactionGymNotFound, TransactionPaymentTypeNotSupported, \
+from exception import TransactionGymNotFound, TransactionPaymentMethodNotSupported, \
     TransactionUserNotFound, TransactionMerchandiseNotFound, TransactionRecordNotFound, TransactionRecordInvalidState, \
     TransactionRecordExpired, TransactionRecordCountUsedUp, InvalidAuthHeaderException
 from utils import non_empty_str
 from gym import EXPIRY_INFO_TYPE
 
-SUPPORTED_PAYMENT_TYPE = {'wechat'}
+SUPPORTED_PAYMENT_METHOD = {'wechat'}
 TRANSACTION_STATE = {"pending": 1, "success": 2, "failed": 3, "canceled": 4, "expired": 5}
 
 
@@ -84,16 +84,18 @@ class Verify(Resource):
             raise TransactionRecordNotFound(transaction_record_id)
         transaction_verified = verify_wechat_transaction(args['transactionId'])
         update_query = {}
-        data = None
         if not transaction_verified:
             update_query['transactionState'] = TRANSACTION_STATE["failed"]
         else:
             update_query['transactionState'] = TRANSACTION_STATE["success"]
         transaction_db.transaction.update_one({"_id": ObjectId(transaction_record_id)}, {'$set': update_query})
         transaction_record = transaction_db.transaction.find_one({"_id": ObjectId(transaction_record_id)})
+        data = []
         if transaction_verified:
-            data = transaction_record
-            data.update({'_id': str(data.get("_id"))})
+            transaction_record.update({'_id': str(transaction_record.get("_id"))})
+            transaction_record.update({'merchandiseId': str(transaction_record.get("merchandiseId"))})
+            transaction_record.update({'recipient': str(transaction_record.get("recipient"))})
+            data.append(transaction_record)
         response = Response(success=transaction_verified, data=data).__dict__
         return response, 200
 
@@ -116,52 +118,45 @@ class Initiate(Resource):
         parser = reqparse.RequestParser()
         parser.add_argument('userEmail', required=True, trim=True, type=non_empty_str, nullable=False,
                             help='User email is required')
-        parser.add_argument('gymId', required=True, type=non_empty_str, nullable=False, help='gymId is required')
         parser.add_argument('merchandiseId', required=True, type=non_empty_str, nullable=False,
                             help='merchandiseId is required')
-        parser.add_argument('paymentType', required=True, type=non_empty_str, nullable=False,
-                            help='paymentType is required')
+        parser.add_argument('paymentMethod', required=True, type=non_empty_str, nullable=False,
+                            help='paymentMethod is required')
         args = parser.parse_args()
         user_email = args['userEmail']
-        gym_id = args['gymId']
         merchandise_id = args['merchandiseId']
-        payment_type = args['paymentType']
-        transaction = Transaction(user_email=user_email, gym_id=gym_id, merchandise_id=merchandise_id,
-                                  payment_type=payment_type)
+        payment_method = args['paymentMethod']
+        transaction = Transaction(user_email=user_email, merchandise_id=merchandise_id,
+                                  payment_method=payment_method)
         return transaction.initiate_transaction()
 
 
 class Transaction:
     user_email = None
-    gym_id = None
     merchandise_id = None
-    payment_type = None
+    payment_method = None
 
-    def __init__(self, user_email, gym_id, merchandise_id, payment_type):
+    def __init__(self, user_email, merchandise_id, payment_method):
         self.user_email = user_email
-        self.gym_id = gym_id
         self.merchandise_id = merchandise_id
-        self.payment_type = payment_type
-        gym_result = gym_db.gym.find_one({"_id": ObjectId(gym_id)})
+        self.payment_method = payment_method
         user_result = user_db.user.find_one({"email": user_email})
         merchandise_result = gym_db.merchandise.find_one({"_id": ObjectId(merchandise_id)})
-        if gym_result is None:
-            raise TransactionGymNotFound(gym_id)
         if user_result is None:
             raise TransactionUserNotFound(user_email)
         if merchandise_result is None:
             raise TransactionMerchandiseNotFound(merchandise_id)
-        if payment_type not in SUPPORTED_PAYMENT_TYPE:
-            raise TransactionPaymentTypeNotSupported(payment_type)
+        if payment_method not in SUPPORTED_PAYMENT_METHOD:
+            raise TransactionPaymentMethodNotSupported(payment_method)
         pass
 
     def initiate_transaction(self):
         merchandise = gym_db.merchandise.find_one({"_id": ObjectId(self.merchandise_id)})
         prepay_id = self.request_wechat_payment()
-        transaction = {"recipient": self.gym_id,
+        transaction = {"recipient": merchandise.get('owner'),
                        "payer": self.user_email,
-                       "paymentMethod": self.payment_type,
-                       "merchandiseId": self.merchandise_id,
+                       "paymentMethod": self.payment_method,
+                       "merchandiseId": merchandise.get('_id'),
                        "transactionState": TRANSACTION_STATE["pending"],
                        "createdDate": str(datetime.datetime.utcnow()),
                        "expiryInfo": merchandise.get('expiryInfo'),
@@ -218,6 +213,8 @@ class TransactionRecord(Resource):
         raw_results = transaction_db.transaction.find(filter=query)
         for result in raw_results:
             result.update({'_id': str(result.get("_id"))})
+            result.update({'merchandiseId': str(result.get("merchandiseId"))})
+            result.update({'recipient': str(result.get("recipient"))})
             results.append(result)
         response = Response(success=True, data=results).__dict__
         return response, 200

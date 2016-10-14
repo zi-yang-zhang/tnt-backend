@@ -18,10 +18,10 @@ class TransactionGymNotFound(Exception):
         self.message = "Error Gym not found: " + gym_id
 
 
-class TransactionPaymentTypeNotSupported(Exception):
+class TransactionPaymentMethodNotSupported(Exception):
     def __init__(self, payment_type):
         self.code = "TX1003"
-        self.message = "Error Transaction Type not supported: " + payment_type
+        self.message = "Error Transaction Method not supported: " + payment_type
 
 
 class TransactionRecordNotFound(Exception):
