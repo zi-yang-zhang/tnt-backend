@@ -11,10 +11,19 @@ from jose import jwt
 import exception
 from basic_response import Response
 from utils import non_empty_str
-from authenticator import user_auth
+from authenticator import user_auth, gym_login_pw_authenticator, AUTHENTICATION_TYPE, authentication_method
 from database import gym_db as db, USER_LEVEL
 
 EXPIRY_INFO_TYPE = {"by_count": 1, "by_duration": 2}
+
+
+@gym_login_pw_authenticator.get_password
+def verify_pw(email):
+    gym = db.gym.find_one({"email": email})
+    if not gym or gym['authMethod']['type'] != AUTHENTICATION_TYPE[0]:
+        return ""
+    else:
+        return gym['authMethod']['method']
 
 
 def merchandise_price(price):
@@ -251,7 +260,7 @@ class Gym(Resource):
         args = parser.parse_args()
         limit = args['find'] if args['find'] is not None else 0
         results = []
-        projection = {'password': 0}
+        projection = {'authMethod': 0}
         query = None
         if args['id'] is not None:
             query = {"_id": ObjectId(args['id'])}
@@ -320,8 +329,6 @@ class Gym(Resource):
             set_target = {}
             if args['email'] is not None:
                 set_target['email'] = args['email']
-            if args['password'] is not None:
-                raise exception.NotSupportedOperationError('update password', 'Gym')
             if args['name'] is not None:
                 set_target['name'] = args['name']
             if args['address'] is not None:
@@ -371,7 +378,6 @@ class Gym(Resource):
         parser = reqparse.RequestParser()
         parser.add_argument('_id', required=True)
         parser.add_argument('email', trim=True, type=non_empty_str, nullable=False)
-        parser.add_argument('password', trim=True, type=non_empty_str, nullable=False)
         parser.add_argument('name', trim=True, type=non_empty_str, nullable=False)
         parser.add_argument('address', trim=True, type=non_empty_str, nullable=False)
         parser.add_argument('geoLocation', type=float, action='append', nullable=False)
@@ -393,7 +399,7 @@ class Gym(Resource):
     def post(self):
         def validate_gym_entry_data_for_creation():
             parser.add_argument('email', required=True, trim=True, type=non_empty_str, nullable=False)
-            parser.add_argument('password', required=True, type=non_empty_str, nullable=False)
+            parser.add_argument('authMethod', required=True, type=authentication_method, nullable=False)
             parser.add_argument('name', required=True, type=non_empty_str, nullable=False)
             parser.add_argument('address', required=True, type=non_empty_str, nullable=False)
             parser.add_argument('geoLocation', type=float, required=True, action='append', nullable=False)
@@ -408,6 +414,9 @@ class Gym(Resource):
             duplicate = db.gym.find_one({"email": args['email']})
             if duplicate is not None:
                 raise exception.DuplicateResourceCreationError(args['email'], 'Gym')
+            if args['authMethod']['type'] == AUTHENTICATION_TYPE[0]:
+                args['authMethod']['method'] = gym_login_pw_authenticator.generate_ha1(args['email'],
+                                                                                       args['authMethod']['method'])
             return args
 
         parser = reqparse.RequestParser()
@@ -417,5 +426,5 @@ class Gym(Resource):
         issued_time = timegm(datetime.utcnow().utctimetuple())
         claims = {'iat': issued_time, 'user': new_gym['email'],
                   'level': USER_LEVEL['User']}
-        jwt_token = str(jwt.encode(claims=claims, key=current_app.secret_key, algorithm='HS256'))
+        jwt_token = str(jwt.encode(claims=claims, key=current_app.secret_key, algorithm='HS512'))
         return json.loads(str(Response(success=True, data={'jwt': jwt_token, 'id': str(new_id)}))), 201

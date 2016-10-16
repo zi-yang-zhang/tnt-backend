@@ -6,7 +6,7 @@ from flask import json
 from flask import request, current_app
 from flask_restful import Resource, reqparse
 from jose import jwt
-
+from authenticator import user_login_pw_authenticator, AUTHENTICATION_TYPE, authentication_method
 from basic_response import Response
 from database import user_db as db, USER_LEVEL
 from utils import non_empty_str
@@ -26,8 +26,16 @@ class DuplicatedUserEmail(Exception):
         self.message = email + " already exists"
 
 
-class User(Resource):
+@user_login_pw_authenticator.get_password
+def verify_pw(email):
+    user = db.user.find_one({"email": email})
+    if not user or user['authMethod']['type'] != AUTHENTICATION_TYPE[0]:
+        return ""
+    else:
+        return user['authMethod']['method']
 
+
+class User(Resource):
     # @user_auth.login_required
     def get(self):
         def sanitize_user_return_data(data=None):
@@ -78,7 +86,6 @@ class User(Resource):
             return json.loads(str(Response(success=False, data=results))), 404
         else:
             return json.loads(str(Response(success=True, data=results)))
-
 
     def put(self):
         # def validate_announcement_entry_data(data=None):
@@ -175,7 +182,7 @@ class User(Resource):
         def validate_user_entry_data_for_creation():
             parser.add_argument('username', required=True, trim=True, type=non_empty_str, nullable=False)
             parser.add_argument('email', required=True, trim=True, type=non_empty_str, nullable=False)
-            parser.add_argument('password', required=True, type=non_empty_str, nullable=False)
+            parser.add_argument('authMethod', required=True, type=authentication_method, nullable=False)
             parser.add_argument('firstName', type=non_empty_str, nullable=False, default="")
             parser.add_argument('lastName', type=non_empty_str, nullable=False, default="")
             parser.add_argument('age', type=int, nullable=False, default=-1)
@@ -187,8 +194,9 @@ class User(Resource):
                 raise DuplicatedUserEmail(args['email'])
             if duplicate_username is not None:
                 raise DuplicatedUsername(args['username'])
-            args['authMethod'] = {'type': "password", 'method': args['password']}
-            del args['password']
+            if args['authMethod']['type'] == AUTHENTICATION_TYPE[0]:
+                args['authMethod']['method'] = user_login_pw_authenticator.generate_ha1(args['email'],
+                                                                                        args['authMethod']['method'])
             return args
 
         parser = reqparse.RequestParser()
@@ -197,5 +205,5 @@ class User(Resource):
         issued_time = timegm(datetime.utcnow().utctimetuple())
         claims = {'iat': issued_time, 'user': new_user['email'],
                   'level': USER_LEVEL['User']}
-        jwt_token = str(jwt.encode(claims=claims, key=current_app.secret_key, algorithm='HS256'))
+        jwt_token = str(jwt.encode(claims=claims, key=current_app.secret_key, algorithm='HS512'))
         return json.loads(str(Response(success=True, data={'jwt': jwt_token}))), 201

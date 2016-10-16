@@ -145,14 +145,37 @@ def create_app():
         response.status_code = 404
         return response
 
+    @application.after_request
+    def add_header(r):
+        """
+        Add headers to both force latest IE rendering engine or Chrome Frame,
+        and also to cache the rendered page for 10 minutes.
+        """
+        r.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        r.headers["Pragma"] = "no-cache"
+        r.headers["Expires"] = "0"
+        r.headers['Cache-Control'] = 'public, max-age=0'
+        try:
+            payload = json.loads(r.get_data())
+            if payload.get('message') is not None:
+                if 'Authorization' in payload.get('message'):
+                    r.status_code = 401
+                    r.set_data(Response(success=False, exceptionMessage=payload.get('message').get('Authorization')))
+                else:
+                    r.set_data(InvalidRequestParamErrorResponse(payload.get('message')))
+        except Exception:
+            pass
+        return r
+
     application.config.from_pyfile(os.environ['setting'])
-    from router import router_blueprint
-    application.register_blueprint(router_blueprint)
+    from router import model_api
+    application.register_blueprint(model_api)
     from transaction import transaction_api
     application.register_blueprint(transaction_api)
+    from authenticator import auth_api
+    application.register_blueprint(auth_api)
     logging.getLogger('flask_cors').level = logging.DEBUG if application.debug else logging.INFO
     fileConfig('logging_config.ini')
-    application.after_request(add_header)
 
     with application.app_context():
         import database
@@ -160,23 +183,4 @@ def create_app():
     return application
 
 
-def add_header(r):
-    """
-    Add headers to both force latest IE rendering engine or Chrome Frame,
-    and also to cache the rendered page for 10 minutes.
-    """
-    r.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
-    r.headers["Pragma"] = "no-cache"
-    r.headers["Expires"] = "0"
-    r.headers['Cache-Control'] = 'public, max-age=0'
-    try:
-        payload = json.loads(r.get_data())
-        if payload.get('message') is not None:
-            if 'Authorization' in payload.get('message'):
-                r.status_code = 401
-                r.set_data(Response(success=False, exceptionMessage=payload.get('message').get('Authorization')))
-            else:
-                r.set_data(InvalidRequestParamErrorResponse(payload.get('message')))
-    except Exception:
-        pass
-    return r
+

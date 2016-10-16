@@ -9,6 +9,7 @@ admin_db = client.admin
 user_db = client.user
 gym_db = client.gym
 transaction_db = client.transaction
+USER_LEVEL = {'DBA': 0, 'SystemAdmin': 1, 'Admin': 2, 'PowerUser': 3, 'User': 4, 'Guest': 5}
 
 
 def initialize():
@@ -19,4 +20,3 @@ def initialize():
     gym_db.gym.create_index([("geoLocation", GEOSPHERE)], background=True)
 
 
-USER_LEVEL = {'DBA': 0, 'SystemAdmin': 1, 'Admin': 2, 'PowerUser': 3, 'User': 4, 'Guest': 5}
