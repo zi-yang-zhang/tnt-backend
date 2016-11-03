@@ -337,7 +337,7 @@ class Gym(Resource):
                 if len(args['geoLocation']) != 2:
                     raise exception.InvalidResourceStructureError('geoLocation', 'Gym update')
                 else:
-                    set_target['geoLocation'] = args['geoLocation']
+                    set_target['geoLocation.coordinates'] = args['geoLocation']
             if args['smallLogo'] is not None:
                 set_target['smallLogo'] = args['smallLogo']
             if args['bigLogo'] is not None:

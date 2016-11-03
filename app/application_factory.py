@@ -4,8 +4,8 @@ import os
 from logging.config import fileConfig
 
 from bson.errors import InvalidId
-from flask import Flask
-from flask import jsonify
+from flask import Flask, jsonify
+from flask_session import Session
 from jose import JWTError
 from pymongo.errors import WriteError
 
@@ -155,6 +155,7 @@ def create_app():
         r.headers["Pragma"] = "no-cache"
         r.headers["Expires"] = "0"
         r.headers['Cache-Control'] = 'public, max-age=0'
+        r.headers['Content-Type'] = 'application/json'
         try:
             payload = json.loads(r.get_data())
             if payload.get('message') is not None:
@@ -168,12 +169,15 @@ def create_app():
         return r
 
     application.config.from_pyfile(os.environ['setting'])
+    Session(app=application)
     from router import model_api
     application.register_blueprint(model_api)
     from transaction import transaction_api
     application.register_blueprint(transaction_api)
     from authenticator import auth_api
     application.register_blueprint(auth_api)
+    from im_auth import im_auth_api
+    application.register_blueprint(im_auth_api)
     logging.getLogger('flask_cors').level = logging.DEBUG if application.debug else logging.INFO
     fileConfig('logging_config.ini')
 

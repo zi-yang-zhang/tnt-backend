@@ -1,20 +1,20 @@
-import dateutil.parser
-from datetime import datetime
 from calendar import timegm
+from datetime import datetime
+
+import dateutil.parser
+from utils import bearer_header_str
 from bson import ObjectId
-from flask import Blueprint
-from flask import current_app
-from flask import current_app as app
+from flask import Blueprint, current_app as app
 from flask_restful import Api, reqparse, Resource
 from jose import jwt
 
 from basic_response import Response
 from database import transaction_db, gym_db, user_db
-from exception import TransactionGymNotFound, TransactionPaymentMethodNotSupported, \
+from exception import TransactionPaymentMethodNotSupported, \
     TransactionUserNotFound, TransactionMerchandiseNotFound, TransactionRecordNotFound, TransactionRecordInvalidState, \
-    TransactionRecordExpired, TransactionRecordCountUsedUp, InvalidAuthHeaderException
-from utils import non_empty_str
+    TransactionRecordExpired, TransactionRecordCountUsedUp
 from gym import EXPIRY_INFO_TYPE
+from utils import non_empty_str
 
 SUPPORTED_PAYMENT_METHOD = {'wechat'}
 TRANSACTION_STATE = {"pending": 1, "success": 2, "failed": 3, "canceled": 4, "expired": 5}
@@ -175,20 +175,6 @@ class Transaction:
         return "prepay_id"
 
 
-def bearer_header_str(bearer_header):
-    if bearer_header == "":
-        raise InvalidAuthHeaderException("Invalid Authorization header type")
-    try:
-        auth_type, token = bearer_header.split(None, 1)
-    except ValueError:
-        raise InvalidAuthHeaderException("Invalid Authorization header type")
-    if auth_type != 'Bearer':
-        raise InvalidAuthHeaderException("Invalid Authorization header type")
-    elif token is None or token == "":
-        raise InvalidAuthHeaderException("Invalid Authorization header type")
-    return token
-
-
 class TransactionRecord(Resource):
 
     def get(self):
@@ -196,10 +182,10 @@ class TransactionRecord(Resource):
         parser.add_argument('Authorization', trim=True, type=bearer_header_str, nullable=False, location='headers', required=True, help='Needs to be logged in to view transaction records')
         args = parser.parse_args()
         token = args['Authorization']
-        claim = jwt.decode(token=token, key=current_app.secret_key, algorithms='HS256',
+        claim = jwt.decode(token=token, key=app.secret_key, algorithms='HS256',
                            options={'verify_exp': False})
         email = claim.get('user')
-        current_app.logger.debug(email)
+        app.logger.debug(email)
         gym_result = gym_db.gym.find_one({"email": email})
         user_result = user_db.gym.find_one({"email": email})
         results = []

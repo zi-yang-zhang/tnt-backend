@@ -1,6 +1,8 @@
 import json
 import bson.json_util
 
+from exception import InvalidAuthHeaderException
+
 
 def prettify_bson(bson_string):
     bson_string['_id'] = bson_string['_id']['$oid']
@@ -30,3 +32,25 @@ def non_empty_str(string):
     if string == "":
         raise ValueError("This string cannot be empty")
     return string
+
+
+def non_empty_and_no_space_str(string):
+    if string == "":
+        raise ValueError("This string cannot be empty")
+    if " " in string:
+        raise ValueError("This string cannot have space")
+    return string
+
+
+def bearer_header_str(bearer_header):
+    if bearer_header == "":
+        raise InvalidAuthHeaderException("Invalid Authorization header type")
+    try:
+        auth_type, token = bearer_header.split(None, 1)
+    except ValueError:
+        raise InvalidAuthHeaderException("Invalid Authorization header type")
+    if auth_type != 'Bearer':
+        raise InvalidAuthHeaderException("Invalid Authorization header type")
+    elif token is None or token == "":
+        raise InvalidAuthHeaderException("Invalid Authorization header type")
+    return token

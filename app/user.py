@@ -3,13 +3,17 @@ from datetime import datetime
 
 from bson.objectid import ObjectId
 from flask import json
-from flask import request, current_app
+from flask import make_response
+from flask import request, current_app, jsonify
 from flask_restful import Resource, reqparse
 from jose import jwt
+
+from exception import InvalidResourceStructureError, InvalidResourceParameterError, InvalidIdUpdateRequestError
 from authenticator import user_login_pw_authenticator, AUTHENTICATION_TYPE, authentication_method
 from basic_response import Response
 from database import user_db as db, USER_LEVEL
-from utils import non_empty_str
+from utils import non_empty_str, non_empty_and_no_space_str
+from im_engine import create_im_user
 
 GENDER = {1: 'male', 2: 'female', 3: 'unknown'}
 
@@ -41,10 +45,6 @@ class User(Resource):
         def sanitize_user_return_data(data=None):
             if data is not None:
                 data.update({'_id': str(data.get("_id"))})
-                if data.get('firstName') is None:
-                    data.update({'firstName': ""})
-                if data.get('lastName') is None:
-                    data.update({'lastName': ""})
                 if data.get('gender') is None:
                     data.update({'gender': 3})
             return data
@@ -88,106 +88,60 @@ class User(Resource):
             return json.loads(str(Response(success=True, data=results)))
 
     def put(self):
-        # def validate_announcement_entry_data(data=None):
-        #     if data is None:
-        #         raise InvalidRequestError('announcement')
-        #     if (data.get('content') is None or data.get('content') == "") and (
-        #             data.get('imageURLs') is None or data.get('imageURLs').__len__() == 0):
-        #         raise InvalidResourceStructureError('content', 'announcement')
-        #     if data.get('scope') is None or data.get('scope') > 2 or data.get('scope') < 1:
-        #         raise InvalidResourceStructureError('scope', 'announcement')
-        #     if data.get('actionType') is not None and data.get('actionType') != "":
-        #         if data.get('actionType').get('type') is None or data.get('actionType').get('type') == "":
-        #             raise InvalidResourceStructureError('actionType', 'announcement')
-        #         if data.get('actionType').get('content') is None or data.get('actionType').get('type') == "":
-        #             raise InvalidResourceStructureError('actionType', 'announcement')
-        #     return data
-        #
-        # def generate_update_gym_command():
-        #     command = {}
-        #     set_target = {}
-        #     if args['email'] is not None:
-        #         set_target['email'] = args['email']
-        #     if args['password'] is not None:
-        #         raise NotSupportedOperationError('update password', 'Gym')
-        #     if args['name'] is not None:
-        #         set_target['name'] = args['name']
-        #     if args['address'] is not None:
-        #         set_target['address'] = args['address']
-        #     if args['geoLocation'] is not None:
-        #         if len(args['geoLocation']) != 2:
-        #             raise InvalidResourceStructureError('geoLocation', 'Gym update')
-        #         else:
-        #             set_target['geoLocation'] = args['geoLocation']
-        #     if args['smallLogo'] is not None:
-        #         set_target['smallLogo'] = args['smallLogo']
-        #     if args['bigLogo'] is not None:
-        #         set_target['bigLogo'] = args['bigLogo']
-        #     if args['detail'] is not None:
-        #         set_target['detail'] = args['detail']
-        #     command['$set'] = set_target
-        #
-        #     if args['service'] is not None:
-        #         if not isinstance(args['service'], list):
-        #             raise InvalidResourceParameterError('service', 'Gym')
-        #         elif len(args['service']) > 0:
-        #             if '$push' not in command:
-        #                 command['$push'] = {}
-        #             command['$push']['service'] = {'$each': args['service']}
-        #
-        #     if args['announcements'] is not None:
-        #         announcements = [validate_announcement_entry_data(announcement) for announcement in args['announcements']]
-        #         if '$push' not in command:
-        #             command['$push'] = {}
-        #         command['$push']['announcements'] = {'$each': announcements}
-        #
-        #     return command
-        #
-        # def validate_privilege_for_gym():
-        #     auth_type, token = request.headers['Authorization'].split(None, 1)
-        #     claim = jwt.decode(token=token, key=current_app.secret_key, algorithms='HS256',
-        #                        options={'verify_exp': False})
-        #     gym_email = claim.get('user')
-        #     request_gym = db.gym.find_one(filter={"email": gym_email})
-        #
-        #     if request_gym is None:
-        #         raise AttemptedToAccessRestrictedResourceError("Gym")
-        #     elif request_gym.get('_id') != ObjectId(id_to_update):
-        #         raise AttemptedToAccessRestrictedResourceError("Gym")
-        #
-        # parser = reqparse.RequestParser()
-        # parser.add_argument('_id', required=True)
-        # parser.add_argument('email', trim=True, type=non_empty_str, nullable=False)
-        # parser.add_argument('password', trim=True, type=non_empty_str, nullable=False)
-        # parser.add_argument('name', trim=True, type=non_empty_str, nullable=False)
-        # parser.add_argument('address', trim=True, type=non_empty_str, nullable=False)
-        # parser.add_argument('geoLocation', type=float, action='append', nullable=False)
-        # parser.add_argument('smallLogo')
-        # parser.add_argument('bigLogo')
-        # parser.add_argument('detail')
-        # parser.add_argument('service', type=dict, action='append')
-        # parser.add_argument('announcements', type=dict, action='append')
-        #
-        # args = parser.parse_args()
-        # id_to_update = args['_id']
-        # validate_privilege_for_gym()
-        # update_query = generate_update_gym_command()
-        # result = db.gym.update_one({"_id": ObjectId(id_to_update)}, update_query)
-        # if result.matched_count == 0:
-        #     raise InvalidIdUpdateRequestError('Gym', id_to_update)
-        # return json.loads(str(Response(success=True, data=str(result.upserted_id))))
-        pass
+        def generate_update_user_query():
+            command = {}
+            set_target = {}
+            if args['nickname'] is not None:
+                set_target['nickname'] = args['nickname']
+            if args['firstName'] is not None:
+                set_target['firstName'] = args['firstName']
+            if args['lastName'] is not None:
+                set_target['lastName'] = args['lastName']
+            if args['age'] is not None:
+                set_target['age'] = args['age']
+            if args['gender'] is not None:
+                set_target['gender'] = args['gender']
+            if args['height'] is not None:
+                set_target['height'] = args['height']
+            if args['tel'] is not None:
+                set_target['tel'] = args['tel']
+            if args['currentLocation'] is not None:
+                if len(args['currentLocation']) != 2:
+                    raise InvalidResourceStructureError('currentLocation', 'Gym update')
+                else:
+                    set_target['geoLocation.coordinates'] = args['currentLocation']
+
+            command['$set'] = set_target
+            if args['favoriteGym'] is not None:
+                if not isinstance(args['favoriteGym'], list):
+                    raise InvalidResourceParameterError('favoriteGym', 'User')
+                elif len(args['favoriteGym']) > 0:
+                    if '$push' not in command:
+                        command['$push'] = {}
+                    command['$push']['favoriteGym'] = {'$each': args['favoriteGym']}
+            return command
+
+        parser = reqparse.RequestParser()
+        parser.add_argument('nickname', trim=True, type=non_empty_and_no_space_str, nullable=False)
+        parser.add_argument('firstName', type=non_empty_str, nullable=False, default="")
+        parser.add_argument('lastName', type=non_empty_str, nullable=False, default="")
+        parser.add_argument('age', type=int, nullable=False, default=-1)
+        parser.add_argument('gender', type=int, choices=(1, 2, 3), nullable=False, default=3)
+        parser.add_argument('height', type=float, nullable=False, default=-1)
+        parser.add_argument('tel', type=str, nullable=False)
+        parser.add_argument('currentLocation', type=float, action='append', nullable=False)
+        parser.add_argument('favoriteGym', type=str, nullable=False)
+
+        args = parser.parse_args()
+        id_to_update = args['_id']
+        update_query = generate_update_user_query()
+        result = db.user.update_one({"_id": ObjectId(id_to_update)}, update_query)
+        if result.matched_count == 0:
+            raise InvalidIdUpdateRequestError('User', id_to_update)
+        return json.loads(str(Response(success=True, data=str(result.upserted_id))))
 
     def post(self):
         def validate_user_entry_data_for_creation():
-            parser.add_argument('username', required=True, trim=True, type=non_empty_str, nullable=False)
-            parser.add_argument('email', required=True, trim=True, type=non_empty_str, nullable=False)
-            parser.add_argument('authMethod', required=True, type=authentication_method, nullable=False)
-            parser.add_argument('firstName', type=non_empty_str, nullable=False, default="")
-            parser.add_argument('lastName', type=non_empty_str, nullable=False, default="")
-            parser.add_argument('age', type=int, nullable=False, default=-1)
-            parser.add_argument('gender', type=int, choices=(1, 2, 3), nullable=False, default=3)
-            args = parser.parse_args()
             duplicate_email = db.user.find_one({"email": args['email']})
             duplicate_username = db.user.find_one({"username": args['username']})
             if duplicate_email is not None:
@@ -197,13 +151,21 @@ class User(Resource):
             if args['authMethod']['type'] == AUTHENTICATION_TYPE[0]:
                 args['authMethod']['method'] = user_login_pw_authenticator.generate_ha1(args['email'],
                                                                                         args['authMethod']['method'])
-            return args
-
         parser = reqparse.RequestParser()
-        new_id = db.user.insert_one(validate_user_entry_data_for_creation()).inserted_id
-        new_user = db.user.find_one({'_id': ObjectId(new_id)})
+        parser.add_argument('username', required=True, trim=True, type=non_empty_and_no_space_str, nullable=False)
+        parser.add_argument('email', required=True, trim=True, type=non_empty_and_no_space_str, nullable=False)
+        parser.add_argument('authMethod', required=True, type=authentication_method, nullable=False)
+        parser.add_argument('nickname', trim=True, type=non_empty_and_no_space_str, nullable=False)
+        parser.add_argument('firstName', type=non_empty_str, nullable=False, default="")
+        parser.add_argument('lastName', type=non_empty_str, nullable=False, default="")
+        parser.add_argument('age', type=int, nullable=False, default=-1)
+        parser.add_argument('gender', type=int, choices=(1, 2, 3), nullable=False, default=3)
+        args = parser.parse_args(strict=True)
+        validate_user_entry_data_for_creation()
+        new_id = db.user.insert_one(args).inserted_id
         issued_time = timegm(datetime.utcnow().utctimetuple())
-        claims = {'iat': issued_time, 'user': new_user['email'],
+        claims = {'iat': issued_time, 'user': args['email'],
                   'level': USER_LEVEL['User']}
         jwt_token = str(jwt.encode(claims=claims, key=current_app.secret_key, algorithm='HS512'))
-        return json.loads(str(Response(success=True, data={'jwt': jwt_token}))), 201
+        # create_im_user(user_id=new_id, username=args['username'], email=args['email'], nickname=args['nickname'])
+        return make_response(Response(success=True, data={'jwt': jwt_token}).get_resp(), 201)

@@ -1,0 +1,78 @@
+version: '2'
+services:
+  app:
+    restart: always
+    build:
+      context: ./app
+      dockerfile: /DockerFiles/dev/Dockerfile
+    ports:
+      - "3000:80"
+    links:
+      - mongo
+    volumes:
+      - ./app:/app
+      - ./tnt/logs/app:/tmp/log
+
+  mongo:
+    restart: always
+    image: mongo:3.3.15
+    ports:
+      - "27017:27017"
+    volumes:
+      - ./tnt/logs/app-db:/data/db
+
+  mysql:
+    restart: always
+    image: mysql/mysql-server:5.7.16
+    ports:
+      - "3306:3306"
+    environment:
+      - MYSQL_RANDOM_ROOT_PASSWORD=yes
+      - MYSQL_ONETIME_PASSWORD=yes
+      - MYSQL_DATABASE=tnt_chat
+      - MYSQL_USER=tnt_admin
+      - MYSQL_PASSWORD=tnt_pw
+    volumes:
+      - ./tnt/db/im:/var/lib/mysql
+      - ./tnt/logs/im-db:/var/log/
+      - ./tnt/conf/im-db:/docker-entrypoint-initdb.d
+
+
+  ejabberd:
+    restart: always
+    build:
+      context: ./ejarbberd
+      dockerfile: /Dockerfile
+    depends_on:
+      - mysql
+    ports:
+      - "5222:5222"
+      - "5269:5269"
+      - "5280:5280"
+    links:
+      - mysql
+    environment:
+      - ERLANG_NODE=ejabberd
+      - EJABBERD_EXT_ADMINS=robert@localhost
+      - EJABBERD_CONFIGURE_SQL=true
+      - EJABBERD_SQL_TYPE=mysql
+      - EJABBERD_SQL_SERVER="mysql"
+      - EJABBERD_SQL_USERNAME="tnt_admin"
+      - EJABBERD_SQL_PASSWORD="tnt_pw"
+      - EJABBERD_SQL_DATABASE="tnt_chat"
+      - EJABBERD_SQL_POOL_SIZE=5
+      - EJABBERD_DEFAULT_DB=sql
+      - EJABBERD_AUTH_METHOD=external
+      - EJABBERD_EXTAUTH_PROGRAM=/opt/ejabberd/scripts/lib/auth_ext_core.py
+      - EJABBERD_EXTAUTH_INSTANCES=3
+      - EJABBERD_EXTAUTH_CACHE=false
+      - AUTH_EXT_HOST=http://app:80
+      - ERLANG_NODE=tnt
+      - EJABBERD_STARTTLS=false
+      - EJABBERD_S2S_SSL=false
+      - EJABBERD_HTTPS=false
+      - EJABBERD_MOD_MUC_ADMIN=true
+      - EJABBERD_LOGLEVEL=5
+    volumes:
+      - ./tnt/logs/im:/var/log/ejabberd
+

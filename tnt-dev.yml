@@ -1,0 +1,22 @@
+version: '2'
+services:
+  app:
+    restart: always
+    build:
+      context: ./app
+      dockerfile: /DockerFiles/dev/Dockerfile
+    ports:
+      - "3000:80"
+    links:
+      - mongo
+    volumes:
+      - ./app:/app
+      - ./tnt/logs/app:/tmp/log
+
+  mongo:
+    restart: always
+    image: mongo:3.3.15
+    ports:
+      - "27017:27017"
+    volumes:
+      - ./tnt/logs/app-db:/data/db

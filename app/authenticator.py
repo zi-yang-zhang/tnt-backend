@@ -38,7 +38,8 @@ AUTHENTICATION_TYPE = ["password", "wechat"]
 
 
 def authentication_method(auth_method):
-    if auth_method is None or auth_method == "" or auth_method.get('type') is None or auth_method.get(
+    if auth_method is None or auth_method == "" or not isinstance(auth_method, dict) or auth_method.get(
+            'type') is None or auth_method.get(
             'type') not in AUTHENTICATION_TYPE or auth_method.get('method') is None or auth_method.get('method') == "":
         raise ValueError('Authentication mal-formatted')
     else:

@@ -1,4 +1,5 @@
 import json
+from flask import jsonify
 
 
 class Response(object):
@@ -12,6 +13,14 @@ class Response(object):
 
     def __str__(self):
         return json.dumps(self.__dict__)
+
+    def get_resp(self):
+        return jsonify(
+            data=self.data,
+            success=self.success,
+            exceptionMessage=self.exceptionMessage
+    )
+
 
 
 class MongoErrorResponse(Response):

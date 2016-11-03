@@ -3,7 +3,7 @@ from pymongo import MongoClient, ALL, GEOSPHERE
 from flask import current_app
 
 
-client = MongoClient(os.environ['MONGO_PORT_27017_TCP_ADDR'], 27017, connect=False)
+client = MongoClient('mongo', 27017, connect=False)
 resource_db = client.main
 admin_db = client.admin
 user_db = client.user
