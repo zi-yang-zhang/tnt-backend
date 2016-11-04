@@ -130,13 +130,13 @@ def create_app():
     @application.errorhandler(DuplicatedUserEmail)
     def handle_invalid_usage(error):
         response = jsonify(ErrorResponse(error).__dict__)
-        response.status_code = 400
+        response.status_code = 200
         return response
 
     @application.errorhandler(DuplicatedUsername)
     def handle_invalid_usage(error):
         response = jsonify(ErrorResponse(error).__dict__)
-        response.status_code = 400
+        response.status_code = 200
         return response
 
     @application.errorhandler(404)
