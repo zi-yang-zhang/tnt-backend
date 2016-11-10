@@ -18,9 +18,7 @@ class Response(object):
         return jsonify(
             data=self.data,
             success=self.success,
-            exceptionMessage=self.exceptionMessage
-    )
-
+            exceptionMessage=self.exceptionMessage)
 
 
 class MongoErrorResponse(Response):

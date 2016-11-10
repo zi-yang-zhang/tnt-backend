@@ -4,10 +4,11 @@ import os
 from logging.config import fileConfig
 
 from bson.errors import InvalidId
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from flask_session import Session
 from jose import JWTError
 from pymongo.errors import WriteError
+from werkzeug.datastructures import Authorization
 
 import exception
 from basic_response import InvalidRequestParamErrorResponse, MongoErrorResponse, ErrorResponse, Response
@@ -61,11 +62,11 @@ def create_app():
         response.status_code = 401
         return response
 
-    @application.errorhandler(TypeError)
-    def handle_invalid_usage(error):
-        response = jsonify(ErrorResponse(error).__dict__)
-        response.status_code = 400
-        return response
+    # @application.errorhandler(TypeError)
+    # def handle_invalid_usage(error):
+    #     response = jsonify(ErrorResponse(error).__dict__)
+    #     response.status_code = 400
+    #     return response
 
     @application.errorhandler(InvalidId)
     def handle_invalid_usage(error):
@@ -144,6 +145,30 @@ def create_app():
         response = jsonify(ErrorResponse(error).__dict__)
         response.status_code = 404
         return response
+
+    @application.errorhandler(exception.AuthenticationUserNotFound)
+    def handle_invalid_usage(error):
+        response = jsonify(ErrorResponse(error).__dict__)
+        response.status_code = 401
+        return response
+
+    @application.errorhandler(exception.AuthenticationUserPasswordWrong)
+    def handle_invalid_usage(error):
+        response = jsonify(ErrorResponse(error).__dict__)
+        response.status_code = 401
+        return response
+
+    @application.errorhandler(exception.AuthenticationUserAuthTypeError)
+    def handle_invalid_usage(error):
+        response = jsonify(ErrorResponse(error).__dict__)
+        response.status_code = 401
+        return response
+
+
+    @application.before_request
+    def print_request():
+        pass
+
 
     @application.after_request
     def add_header(r):

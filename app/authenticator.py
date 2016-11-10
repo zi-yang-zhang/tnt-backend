@@ -2,7 +2,10 @@ import base64
 from calendar import timegm
 from datetime import datetime
 
-from flask import request, make_response, current_app as app
+from flask import request, make_response, current_app as app, jsonify
+
+from exception import AuthenticationUserPasswordWrong
+from basic_response import Response, ErrorResponse
 from flask_httpauth import HTTPTokenAuth, HTTPDigestAuth, MultiAuth
 from flask_restful import Resource
 from jose import jwt, JWTError
@@ -46,6 +49,16 @@ def authentication_method(auth_method):
         return auth_method
 
 
+@user_login_pw_authenticator.error_handler
+def user_pw_auth_failed():
+    return jsonify(ErrorResponse(AuthenticationUserPasswordWrong()).__dict__)
+
+
+@gym_login_pw_authenticator.error_handler
+def user_pw_auth_failed():
+    return jsonify(ErrorResponse(AuthenticationUserPasswordWrong()).__dict__)
+
+
 @admin_token_auth.verify_token
 def verify_token(token):
     username, password = base64.decodestring(token).split(':')
@@ -71,8 +84,8 @@ class UserAuthToken(Resource):
     @user_login_authenticator.login_required
     def get(self):
         issued_time = timegm(datetime.utcnow().utctimetuple())
-        claims = {'iat': issued_time, 'email': user_login_pw_authenticator.username(), 'level': USER_LEVEL['User']}
-        return jwt.encode(claims=claims, key=app.secret_key, algorithm='HS512')
+        claims = {'iat': issued_time, 'username': user_login_pw_authenticator.username(), 'level': USER_LEVEL['User']}
+        return Response(success=True, data={'jwt': jwt.encode(claims=claims, key=app.secret_key, algorithm='HS512')}).__dict__, 200
 
 
 class GymAuthToken(Resource):
@@ -80,7 +93,7 @@ class GymAuthToken(Resource):
     def get(self):
         issued_time = timegm(datetime.utcnow().utctimetuple())
         claims = {'iat': issued_time, 'email': gym_login_pw_authenticator.username(), 'level': USER_LEVEL['User']}
-        return jwt.encode(claims=claims, key=app.secret_key, algorithm='HS512')
+        return Response(success=True, data={'jwt': jwt.encode(claims=claims, key=app.secret_key, algorithm='HS512')}).__dict__, 200
 
 
 # class AdminAuthToken(Resource):

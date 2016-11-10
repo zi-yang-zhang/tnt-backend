@@ -20,8 +20,10 @@ EXPIRY_INFO_TYPE = {"by_count": 1, "by_duration": 2}
 @gym_login_pw_authenticator.get_password
 def verify_pw(email):
     gym = db.gym.find_one({"email": email})
-    if not gym or gym['authMethod']['type'] != AUTHENTICATION_TYPE[0]:
-        return ""
+    if not gym:
+        raise exception.AuthenticationUserNotFound
+    elif gym['authMethod']['type'] != AUTHENTICATION_TYPE[0]:
+        raise exception.AuthenticationUserAuthTypeError(AUTHENTICATION_TYPE[0], gym['authMethod']['type'])
     else:
         return gym['authMethod']['method']
 

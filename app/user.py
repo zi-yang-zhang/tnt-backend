@@ -8,7 +8,8 @@ from flask import request, current_app, jsonify
 from flask_restful import Resource, reqparse
 from jose import jwt
 
-from exception import InvalidResourceStructureError, InvalidResourceParameterError, InvalidIdUpdateRequestError
+from exception import InvalidResourceStructureError, InvalidResourceParameterError, InvalidIdUpdateRequestError, \
+    AuthenticationUserNotFound, AuthenticationUserAuthTypeError
 from authenticator import user_login_pw_authenticator, AUTHENTICATION_TYPE, authentication_method
 from basic_response import Response
 from database import user_db as db, USER_LEVEL
@@ -31,10 +32,12 @@ class DuplicatedUserEmail(Exception):
 
 
 @user_login_pw_authenticator.get_password
-def verify_pw(email):
-    user = db.user.find_one({"email": email})
-    if not user or user['authMethod']['type'] != AUTHENTICATION_TYPE[0]:
-        return ""
+def get_pw(username):
+    user = db.user.find_one({"username": username})
+    if not user:
+        raise AuthenticationUserNotFound
+    elif user['authMethod']['type'] != AUTHENTICATION_TYPE[0]:
+        raise AuthenticationUserAuthTypeError(AUTHENTICATION_TYPE[0], user['authMethod']['type'])
     else:
         return user['authMethod']['method']
 
@@ -149,7 +152,7 @@ class User(Resource):
             if duplicate_username is not None:
                 raise DuplicatedUsername(args['username'])
             if args['authMethod']['type'] == AUTHENTICATION_TYPE[0]:
-                args['authMethod']['method'] = user_login_pw_authenticator.generate_ha1(args['email'],
+                args['authMethod']['method'] = user_login_pw_authenticator.generate_ha1(args['username'],
                                                                                         args['authMethod']['method'])
         parser = reqparse.RequestParser()
         parser.add_argument('username', required=True, trim=True, type=non_empty_and_no_space_str, nullable=False)
@@ -162,10 +165,8 @@ class User(Resource):
         parser.add_argument('gender', type=int, choices=(1, 2, 3), nullable=False, default=3)
         args = parser.parse_args(strict=True)
         validate_user_entry_data_for_creation()
-        new_id = db.user.insert_one(args).inserted_id
+        db.user.insert_one(args)
         issued_time = timegm(datetime.utcnow().utctimetuple())
-        claims = {'iat': issued_time, 'user': args['email'],
-                  'level': USER_LEVEL['User']}
-        jwt_token = str(jwt.encode(claims=claims, key=current_app.secret_key, algorithm='HS512'))
+        claims = {'iat': issued_time, 'username': args['username'], 'level': USER_LEVEL['User']}
         # create_im_user(user_id=new_id, username=args['username'], email=args['email'], nickname=args['nickname'])
-        return make_response(Response(success=True, data={'jwt': jwt_token}).get_resp(), 201)
+        return make_response(Response(success=True, data={'jwt': jwt.encode(claims=claims, key=current_app.secret_key, algorithm='HS512')}).get_resp(), 201)

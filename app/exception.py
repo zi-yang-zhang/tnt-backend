@@ -106,3 +106,21 @@ class InvalidAuthHeaderException(Exception):
     def __init__(self, message):
         self.code = "A1000"
         self.message = message
+
+
+class AuthenticationUserNotFound(Exception):
+    def __init__(self):
+        self.code = "A1000"
+        self.message = "User not found"
+
+
+class AuthenticationUserPasswordWrong(Exception):
+    def __init__(self):
+        self.code = "A1001"
+        self.message = "User password wrong"
+
+
+class AuthenticationUserAuthTypeError(Exception):
+    def __init__(self, expected, actual):
+        self.code = "A1002"
+        self.message = "Expecting {}, but received {}".format(expected, actual)
