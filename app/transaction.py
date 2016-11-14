@@ -2,6 +2,8 @@ from calendar import timegm
 from datetime import datetime
 
 import dateutil.parser
+
+from authenticator import CLIENT_TYPE
 from utils import bearer_header_str
 from bson import ObjectId
 from flask import Blueprint, current_app as app
@@ -182,16 +184,16 @@ class TransactionRecord(Resource):
         parser.add_argument('Authorization', trim=True, type=bearer_header_str, nullable=False, location='headers', required=True, help='Needs to be logged in to view transaction records')
         args = parser.parse_args()
         token = args['Authorization']
-        claim = jwt.decode(token=token, key=app.secret_key, algorithms='HS256',
+        claim = jwt.decode(token=token, key=app.secret_key, algorithms='HS512',
                            options={'verify_exp': False})
-        email = claim.get('user')
-        app.logger.debug(email)
-        gym_result = gym_db.gym.find_one({"email": email})
-        user_result = user_db.gym.find_one({"email": email})
+        target_id = claim.get('id')
+        client_type = claim.get('type')
         results = []
-        if user_result is not None:
-            query = {'payer': email}
-        elif gym_result is not None:
+        if client_type == CLIENT_TYPE[1]:
+            user_result = user_db.user.find_one({"_id": ObjectId(target_id)})
+            query = {'payer': user_result['email']}
+        elif client_type == CLIENT_TYPE[0]:
+            gym_result = gym_db.gym.find_one({"_id": ObjectId(target_id)})
             query = {'recipient': gym_result.get('_id')}
         else:
             response = Response(success=False, data=[]).__dict__

@@ -268,6 +268,23 @@ class HTTPDigestAuth(HTTPAuth):
         return decorated
 
 
+    def username(self):
+        if not request.authorization:
+            try:
+                auth_type, payload = request.headers['Authorization'].split(
+                    None, 1)
+                payload_args = payload.split(',')
+                auth_args = {}
+                for arg in payload_args:
+                    arg_pair = arg.split('=')
+                    auth_args[arg_pair[0].strip()] = arg_pair[1].strip("\"").encode('utf-8')
+                auth = Authorization(auth_type, auth_args)
+            except ValueError as e:
+                # The Authorization header is either empty or has no token
+                return ""
+            return auth.username
+        return request.authorization.username
+
 class HTTPTokenAuth(HTTPAuth):
     def __init__(self, scheme='Bearer', realm=None):
         super(HTTPTokenAuth, self).__init__(scheme, realm)

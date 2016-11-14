@@ -4,14 +4,15 @@ from datetime import datetime
 
 from bson.errors import InvalidId
 from bson.objectid import ObjectId
+from flask import Blueprint
 from flask import request, current_app
-from flask_restful import Resource, reqparse
+from flask_restful import Resource, reqparse, Api
 from jose import jwt
 
 import exception
 from basic_response import Response
 from utils import non_empty_str
-from authenticator import user_auth, gym_login_pw_authenticator, AUTHENTICATION_TYPE, authentication_method
+from authenticator import user_auth, gym_login_pw_authenticator, AUTHENTICATION_TYPE, authentication_method, CLIENT_TYPE
 from database import gym_db as db, USER_LEVEL
 
 EXPIRY_INFO_TYPE = {"by_count": 1, "by_duration": 2}
@@ -62,27 +63,29 @@ def merchandise_schedule(schedule):
         return schedule
 
 
-class Merchandise(Resource):
-    def get(self):
-        def sanitize_merchandise_return_data(data=None):
-            if data is not None:
-                data.update({'_id': str(data.get("_id"))})
-                if data.get('tag') is None:
-                    data.update({'tag': ""})
-                if data.get('detail') is None:
-                    data.update({'detail': ""})
-                if data.get('summary') is None:
-                    data.update({'summary': ""})
-                if data.get('schedule') is None:
-                    data.update({'schedule': []})
-                if data.get('imageURLs') is None:
-                    data.update({'imageURLs': []})
-                gym_id = data.get('owner')
-                owner = db.gym.find_one({"_id": gym_id})
-                owner.update({'_id': str(owner.get("_id"))})
-                data.update({'owner': owner})
-            return data
+def sanitize_merchandise_return_data(data=None):
+    if data is not None:
+        data.update({'_id': str(data.get("_id"))})
+        if data.get('tag') is None:
+            data.update({'tag': ""})
+        if data.get('detail') is None:
+            data.update({'detail': ""})
+        if data.get('summary') is None:
+            data.update({'summary': ""})
+        if data.get('schedule') is None:
+            data.update({'schedule': []})
+        if data.get('imageURLs') is None:
+            data.update({'imageURLs': []})
+        gym_id = data.get('owner')
+        owner = db.gym.find_one({"_id": gym_id})
+        owner.update({'_id': str(owner.get("_id"))})
+        data.update({'owner': owner})
+    return data
 
+
+class Merchandise(Resource):
+
+    def get(self):
         parser = reqparse.RequestParser()
         parser.add_argument('id', location='args')
         parser.add_argument('keyword', location='args')
@@ -112,13 +115,11 @@ class Merchandise(Resource):
         else:
             return json.loads(str(Response(success=True, data=results)))
 
+    @user_auth.login_required
     def put(self):
-
         def generate_update_merchandise_command():
             command = {}
             set_target = {}
-            if args['type'] is not None:
-                set_target['type'] = args['type']
             if args['name'] is not None:
                 set_target['name'] = args['name']
             if args['detail'] is not None:
@@ -160,7 +161,6 @@ class Merchandise(Resource):
 
         parser = reqparse.RequestParser()
         parser.add_argument('_id', required=True)
-        parser.add_argument('type', type=int, choices=(1, 2), nullable=False)
         parser.add_argument('name', type=non_empty_str, nullable=False)
         parser.add_argument('detail', type=non_empty_str, nullable=False)
         parser.add_argument('owner', type=non_empty_str, nullable=False)
@@ -180,10 +180,9 @@ class Merchandise(Resource):
             raise exception.InvalidIdUpdateRequestError('Merchandise', args['_id'])
         return json.loads(str(Response(success=True, data=str(result.upserted_id))))
 
-    # @user_auth.login_required
+    @user_auth.login_required
     def post(self):
         def validate_merchandise_entry_data_for_creation():
-            parser.add_argument('type', type=int, required=True, choices=(1, 2), nullable=False)
             parser.add_argument('name', required=True, type=non_empty_str, nullable=False)
             parser.add_argument('detail', required=True, type=non_empty_str, nullable=False)
             parser.add_argument('owner', required=True, type=non_empty_str, nullable=False)
@@ -219,10 +218,10 @@ class Merchandise(Resource):
     def validate_gym_privilege_for_merchandise(id_to_validate):
         auth_type, token = request.headers['Authorization'].split(
             None, 1)
-        claim = jwt.decode(token=token, key=current_app.secret_key, algorithms='HS256',
+        claim = jwt.decode(token=token, key=current_app.secret_key, algorithms='HS512',
                            options={'verify_exp': False})
-        gym_email = claim.get('user')
-        gym = db.gym.find_one(filter={"email": gym_email})
+        gym_id = claim.get('id')
+        gym = db.gym.find_one(filter={"_id": gym_id})
         merchandise = db.merchandise.find_one(filter={"_id": ObjectId(id_to_validate)})
         if gym is None:
             raise exception.AttemptedToAccessRestrictedResourceError("Merchandise")
@@ -230,26 +229,28 @@ class Merchandise(Resource):
             raise exception.AttemptedToAccessRestrictedResourceError("Merchandise")
 
 
-class Gym(Resource):
-    def get(self):
-        def sanitize_gym_return_data(data=None):
-            if data is not None:
-                data.update({'_id': str(data.get("_id"))})
-                if data.get('detail') is None:
-                    data.update({'detail': ""})
-                if data.get('smallLogo') is None:
-                    data.update({'smallLogo': ""})
-                if data.get('bigLogo') is None:
-                    data.update({'bigLogo': ""})
-                if data.get('services') is None:
-                    data.update({'services': []})
-                if data.get('announcements') is None:
-                    data.update({'announcements': []})
-                if data.get('equipments') is None:
-                    data.update({'equipments': []})
-                data.update({'geoLocation': data.get('geoLocation').get('coordinates')})
-            return data
+def sanitize_gym_return_data(data=None):
+    if data is not None:
+        data.update({'_id': str(data.get("_id"))})
+        if data.get('detail') is None:
+            data.update({'detail': ""})
+        if data.get('smallLogo') is None:
+            data.update({'smallLogo': ""})
+        if data.get('bigLogo') is None:
+            data.update({'bigLogo': ""})
+        if data.get('services') is None:
+            data.update({'services': []})
+        if data.get('announcements') is None:
+            data.update({'announcements': []})
+        if data.get('equipments') is None:
+            data.update({'equipments': []})
+        data.update({'geoLocation': {'lng': data.get('geoLocation').get('coordinates')[0], 'lat': data.get('geoLocation').get('coordinates')[1]}})
+    return data
 
+
+class Gym(Resource):
+
+    def get(self):
         parser = reqparse.RequestParser()
         parser.add_argument('id', help='id of gym', location='args')
         parser.add_argument('email', help='email of gym', location='args')
@@ -268,10 +269,10 @@ class Gym(Resource):
             query = {"_id": ObjectId(args['id'])}
             if request.headers.get('Authorization') is not None:
                 auth_type, token = request.headers['Authorization'].split(None, 1)
-                claim = jwt.decode(token=token, key=current_app.secret_key, algorithms='HS256',
+                claim = jwt.decode(token=token, key=current_app.secret_key, algorithms='HS512',
                                    options={'verify_exp': False})
-                gym_email = claim.get('user')
-                request_gym = db.gym.find_one(filter={"email": gym_email})
+                gym_id = claim.get('id')
+                request_gym = db.gym.find_one(filter={"_id": gym_id})
                 if request_gym is not None and request_gym.get('_id') != ObjectId(args['id']):
                     projection['email'] = 0
             else:
@@ -308,6 +309,7 @@ class Gym(Resource):
         else:
             return json.loads(str(Response(success=True, data=results)))
 
+    @user_auth.login_required
     def put(self):
         def validate_announcement_entry_data(data=None):
             if data is None:
@@ -365,20 +367,7 @@ class Gym(Resource):
 
             return command
 
-        def validate_privilege_for_gym():
-            auth_type, token = request.headers['Authorization'].split(None, 1)
-            claim = jwt.decode(token=token, key=current_app.secret_key, algorithms='HS256',
-                               options={'verify_exp': False})
-            gym_email = claim.get('user')
-            request_gym = db.gym.find_one(filter={"email": gym_email})
-
-            if request_gym is None:
-                raise exception.AttemptedToAccessRestrictedResourceError("Gym")
-            elif request_gym.get('_id') != ObjectId(id_to_update):
-                raise exception.AttemptedToAccessRestrictedResourceError("Gym")
-
         parser = reqparse.RequestParser()
-        parser.add_argument('_id', required=True)
         parser.add_argument('email', trim=True, type=non_empty_str, nullable=False)
         parser.add_argument('name', trim=True, type=non_empty_str, nullable=False)
         parser.add_argument('address', trim=True, type=non_empty_str, nullable=False)
@@ -390,8 +379,7 @@ class Gym(Resource):
         parser.add_argument('announcements', type=dict, action='append')
 
         args = parser.parse_args()
-        id_to_update = args['_id']
-        validate_privilege_for_gym()
+        id_to_update = validate_privilege_for_gym()
         update_query = generate_update_gym_command()
         result = db.gym.update_one({"_id": ObjectId(id_to_update)}, update_query)
         if result.matched_count == 0:
@@ -424,9 +412,40 @@ class Gym(Resource):
         parser = reqparse.RequestParser()
         new_id = db.gym.insert_one(validate_gym_entry_data_for_creation()).inserted_id
         new_gym = db.gym.find_one({'_id': ObjectId(new_id)})
-
         issued_time = timegm(datetime.utcnow().utctimetuple())
-        claims = {'iat': issued_time, 'user': new_gym['email'],
-                  'level': USER_LEVEL['User']}
+        claims = {'iat': issued_time, 'id': str(new_gym['_id']),
+                  'type': CLIENT_TYPE[0]}
         jwt_token = str(jwt.encode(claims=claims, key=current_app.secret_key, algorithm='HS512'))
-        return json.loads(str(Response(success=True, data={'jwt': jwt_token, 'id': str(new_id)}))), 201
+        return json.loads(str(Response(success=True, data={'jwt': jwt_token, 'gym': sanitize_gym_return_data(new_gym)}))), 201
+
+
+def validate_privilege_for_gym():
+    auth_type, token = request.headers['Authorization'].split(None, 1)
+    claim = jwt.decode(token=token, key=current_app.secret_key, algorithms='HS512',
+                       options={'verify_exp': False})
+    gym_id = claim.get('id')
+    request_gym = db.gym.find_one(filter={"_id": gym_id})
+    if request_gym is None:
+        raise exception.AttemptedToAccessRestrictedResourceError("Gym")
+    return gym_id
+
+
+class Sync(Resource):
+
+    @user_auth.login_required
+    def get(self):
+        target_id = validate_privilege_for_gym()
+        gym = db.gym.find_one({'_id': ObjectId(target_id)})
+        merchandises = []
+        raw_results = db.merchandise.find(filter={'owner': ObjectId(target_id)}, limit=20)
+        for result in raw_results:
+            merchandises.append(sanitize_merchandise_return_data(result))
+        return Response(success=True,
+                        data={'gym': gym, 'merchandises': merchandises}).__dict__, 200
+
+
+gym_api = Blueprint("gym_api", __name__, url_prefix='/api/gym')
+gym_api_router = Api(gym_api)
+gym_api_router.add_resource(Gym, '/')
+gym_api_router.add_resource(Merchandise, '/merchandise')
+gym_api_router.add_resource(Sync, '/sync')

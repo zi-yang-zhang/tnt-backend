@@ -62,11 +62,11 @@ def create_app():
         response.status_code = 401
         return response
 
-    # @application.errorhandler(TypeError)
-    # def handle_invalid_usage(error):
-    #     response = jsonify(ErrorResponse(error).__dict__)
-    #     response.status_code = 400
-    #     return response
+    @application.errorhandler(TypeError)
+    def handle_invalid_usage(error):
+        response = jsonify(ErrorResponse(error).__dict__)
+        response.status_code = 400
+        return response
 
     @application.errorhandler(InvalidId)
     def handle_invalid_usage(error):
@@ -195,8 +195,10 @@ def create_app():
 
     application.config.from_pyfile(os.environ['setting'])
     Session(app=application)
-    from router import model_api
-    application.register_blueprint(model_api)
+    from user import user_api
+    application.register_blueprint(user_api)
+    from gym import gym_api
+    application.register_blueprint(gym_api)
     from transaction import transaction_api
     application.register_blueprint(transaction_api)
     from authenticator import auth_api

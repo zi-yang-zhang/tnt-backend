@@ -2,9 +2,10 @@ import base64
 from calendar import timegm
 from datetime import datetime
 
+from bson import ObjectId
 from flask import request, make_response, current_app as app, jsonify
 
-from exception import AuthenticationUserPasswordWrong
+from exception import AuthenticationUserPasswordWrong, JWTNotVerified
 from basic_response import Response, ErrorResponse
 from flask_httpauth import HTTPTokenAuth, HTTPDigestAuth, MultiAuth
 from flask_restful import Resource
@@ -12,7 +13,6 @@ from jose import jwt, JWTError
 from passlib.hash import sha256_crypt
 
 from database import USER_LEVEL
-from database import admin_db as db
 
 from flask import Blueprint
 from flask_restful import Api
@@ -33,11 +33,11 @@ user_login_pw_authenticator = HTTPDigestAuth(scheme=TNT_USER_AUTH_SCHEME, realm=
 user_login_authenticator = MultiAuth(main_auth=user_login_pw_authenticator)
 
 gym_login_pw_authenticator = HTTPDigestAuth(scheme=TNT_GYM_AUTH_SCHEME, realm='gym', use_ha1_pw=True)
-gym_login_authenticator = MultiAuth(main_auth=gym_login_pw_authenticator)
 
 SESSION_TIMEOUT = 2628000
 
 AUTHENTICATION_TYPE = ["password", "wechat"]
+CLIENT_TYPE = ["gym", "user"]
 
 
 def authentication_method(auth_method):
@@ -59,14 +59,19 @@ def user_pw_auth_failed():
     return jsonify(ErrorResponse(AuthenticationUserPasswordWrong()).__dict__)
 
 
-@admin_token_auth.verify_token
-def verify_token(token):
-    username, password = base64.decodestring(token).split(':')
-    user = db.user.find_one(filter={"username": username})
-    if user is None:
-        app.logger.error("user %s not found", username)
-        return False
-    return sha256_crypt.verify(password, user['hashed_password'])
+@user_auth.error_handler
+def user_pw_auth_failed():
+    return jsonify(ErrorResponse(JWTNotVerified()).__dict__)
+
+
+# @admin_token_auth.verify_token
+# def verify_token(token):
+#     username, password = base64.decodestring(token).split(':')
+#     user = db.user.find_one(filter={"username": username})
+#     if user is None:
+#         app.logger.error("user %s not found", username)
+#         return False
+#     return sha256_crypt.verify(password, user['hashed_password'])
 
 
 @resource_access_auth.verify_token
@@ -83,17 +88,39 @@ def verify_token(token):
 class UserAuthToken(Resource):
     @user_login_authenticator.login_required
     def get(self):
+        from database import user_db as db
+        import user as api
+        username = user_login_pw_authenticator.username()
+        user = db.user.find_one({'username': username})
+        transaction_records = []
+        from database import transaction_db
+        raw_results = transaction_db.transaction.find(filter={'payer': user['email']})
+        for result in raw_results:
+            result.update({'_id': str(result.get("_id"))})
+            result.update({'merchandiseId': str(result.get("merchandiseId"))})
+            result.update({'recipient': str(result.get("recipient"))})
+            transaction_records.append(result)
         issued_time = timegm(datetime.utcnow().utctimetuple())
-        claims = {'iat': issued_time, 'username': user_login_pw_authenticator.username(), 'level': USER_LEVEL['User']}
-        return Response(success=True, data={'jwt': jwt.encode(claims=claims, key=app.secret_key, algorithm='HS512')}).__dict__, 200
+        claims = {'iat': issued_time, 'id': str(user['_id']), 'type': CLIENT_TYPE[1]}
+        return Response(success=True, data={'jwt': jwt.encode(claims=claims, key=app.secret_key, algorithm='HS512'),
+                                            'user': api.sanitize_user_return_data(user), 'transactionRecords': transaction_records}).__dict__, 200
 
 
 class GymAuthToken(Resource):
-    @gym_login_authenticator.login_required
+    @gym_login_pw_authenticator.login_required
     def get(self):
+        from database import gym_db as db
+        import gym as api
+        gym_email = gym_login_pw_authenticator.username()
+        gym = db.gym.find_one({'email': gym_email})
+        merchandises = []
+        raw_results = db.merchandise.find(filter={'owner': gym['_id']}, limit=20)
+        for result in raw_results:
+            merchandises.append(api.sanitize_merchandise_return_data(result))
         issued_time = timegm(datetime.utcnow().utctimetuple())
-        claims = {'iat': issued_time, 'email': gym_login_pw_authenticator.username(), 'level': USER_LEVEL['User']}
-        return Response(success=True, data={'jwt': jwt.encode(claims=claims, key=app.secret_key, algorithm='HS512')}).__dict__, 200
+        claims = {'iat': issued_time, 'id': str(gym['_id']), 'type': CLIENT_TYPE[0]}
+        return Response(success=True, data={'jwt': jwt.encode(claims=claims, key=app.secret_key, algorithm='HS512'),
+                                            'gym': api.sanitize_gym_return_data(gym), 'merchandises': merchandises}).__dict__, 200
 
 
 # class AdminAuthToken(Resource):

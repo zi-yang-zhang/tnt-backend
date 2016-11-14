@@ -102,6 +102,12 @@ class NotSupportedOperationError(Exception):
         self.message = operation + " is not supported for " + str(resources)
 
 
+class JWTNotVerified(Exception):
+    def __init__(self):
+        self.code = "E1009"
+        self.message = "JWT not verified"
+
+
 class InvalidAuthHeaderException(Exception):
     def __init__(self, message):
         self.code = "A1000"
@@ -124,3 +130,5 @@ class AuthenticationUserAuthTypeError(Exception):
     def __init__(self, expected, actual):
         self.code = "A1002"
         self.message = "Expecting {}, but received {}".format(expected, actual)
+
+

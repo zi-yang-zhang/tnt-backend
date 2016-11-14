@@ -2,19 +2,20 @@ from calendar import timegm
 from datetime import datetime
 
 from bson.objectid import ObjectId
+from flask import Blueprint
 from flask import json
 from flask import make_response
-from flask import request, current_app, jsonify
-from flask_restful import Resource, reqparse
+from flask import request, current_app
+from flask_restful import Resource, reqparse, Api
 from jose import jwt
 
-from exception import InvalidResourceStructureError, InvalidResourceParameterError, InvalidIdUpdateRequestError, \
-    AuthenticationUserNotFound, AuthenticationUserAuthTypeError
-from authenticator import user_login_pw_authenticator, AUTHENTICATION_TYPE, authentication_method
+from authenticator import user_login_pw_authenticator, AUTHENTICATION_TYPE, authentication_method, user_auth, \
+    CLIENT_TYPE
 from basic_response import Response
 from database import user_db as db, USER_LEVEL
+from exception import InvalidResourceStructureError, InvalidResourceParameterError, InvalidIdUpdateRequestError, \
+    AuthenticationUserNotFound, AuthenticationUserAuthTypeError
 from utils import non_empty_str, non_empty_and_no_space_str
-from im_engine import create_im_user
 
 GENDER = {1: 'male', 2: 'female', 3: 'unknown'}
 
@@ -34,6 +35,8 @@ class DuplicatedUserEmail(Exception):
 @user_login_pw_authenticator.get_password
 def get_pw(username):
     user = db.user.find_one({"username": username})
+    current_app.logger.debug(username)
+
     if not user:
         raise AuthenticationUserNotFound
     elif user['authMethod']['type'] != AUTHENTICATION_TYPE[0]:
@@ -42,16 +45,17 @@ def get_pw(username):
         return user['authMethod']['method']
 
 
+def sanitize_user_return_data(data=None):
+    if data is not None:
+        data.update({'_id': str(data.get("_id"))})
+        if data.get('gender') is None:
+            data.update({'gender': 3})
+    return data
+
+
 class User(Resource):
     # @user_auth.login_required
     def get(self):
-        def sanitize_user_return_data(data=None):
-            if data is not None:
-                data.update({'_id': str(data.get("_id"))})
-                if data.get('gender') is None:
-                    data.update({'gender': 3})
-            return data
-
         parser = reqparse.RequestParser()
         parser.add_argument('id', location='args')
         parser.add_argument('email', location='args')
@@ -90,6 +94,7 @@ class User(Resource):
         else:
             return json.loads(str(Response(success=True, data=results)))
 
+    @user_auth.login_required
     def put(self):
         def generate_update_user_query():
             command = {}
@@ -165,8 +170,33 @@ class User(Resource):
         parser.add_argument('gender', type=int, choices=(1, 2, 3), nullable=False, default=3)
         args = parser.parse_args(strict=True)
         validate_user_entry_data_for_creation()
-        db.user.insert_one(args)
+        new_user_id = db.user.insert_one(args).inserted_id
+        new_user = db.user.find_one(filter={'_id': ObjectId(new_user_id)}, projection={'authMethod': 0})
         issued_time = timegm(datetime.utcnow().utctimetuple())
-        claims = {'iat': issued_time, 'username': args['username'], 'level': USER_LEVEL['User']}
-        # create_im_user(user_id=new_id, username=args['username'], email=args['email'], nickname=args['nickname'])
-        return make_response(Response(success=True, data={'jwt': jwt.encode(claims=claims, key=current_app.secret_key, algorithm='HS512')}).get_resp(), 201)
+        claims = {'iat': issued_time, 'id': str(new_user['_id']), 'type': CLIENT_TYPE[1]}
+        # create_im_useuser_authr(user_id=new_id, username=args['username'], email=args['email'], nickname=args['nickname'])
+        return make_response(Response(success=True, data={'jwt': jwt.encode(claims=claims, key=current_app.secret_key, algorithm='HS512'),
+                                                          'user': sanitize_user_return_data(new_user)}).get_resp(), 201)
+
+
+class Sync(Resource):
+    @user_auth.login_required
+    def get(self):
+        target_id = sanitize_user_return_data()
+        user = db.user.find_one(filter={'_id': ObjectId(target_id)}, projection={'authMethod': 0})
+        transaction_records = []
+        from database import transaction_db
+        raw_results = transaction_db.transaction.find(filter={'payer': user['email']})
+        for result in raw_results:
+            result.update({'_id': str(result.get("_id"))})
+            result.update({'merchandiseId': str(result.get("merchandiseId"))})
+            result.update({'recipient': str(result.get("recipient"))})
+            transaction_records.append(result)
+        return Response(success=True,
+                        data={'user': user, 'transactionRecords': transaction_records}).__dict__, 200
+
+
+user_api = Blueprint("user_api", __name__, url_prefix='/api/user')
+user_api_router = Api(user_api)
+user_api_router.add_resource(User, '/')
+user_api_router.add_resource(Sync, '/sync')
