@@ -199,6 +199,8 @@ def create_app():
     application.register_blueprint(user_api)
     from gym import gym_api
     application.register_blueprint(gym_api)
+    from gym import merchandise_api
+    application.register_blueprint(merchandise_api)
     from transaction import transaction_api
     application.register_blueprint(transaction_api)
     from authenticator import auth_api

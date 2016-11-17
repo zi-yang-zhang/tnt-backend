@@ -54,11 +54,10 @@ def sanitize_user_return_data(data=None):
 
 
 class User(Resource):
-    # @user_auth.login_required
+
     def get(self):
         parser = reqparse.RequestParser()
         parser.add_argument('id', location='args')
-        parser.add_argument('email', location='args')
         parser.add_argument('keyword', location='args')
         parser.add_argument('find', type=int, help='number of desire response', location='args')
         args = parser.parse_args()
@@ -76,15 +75,17 @@ class User(Resource):
                 request_user = db.user.find_one(filter={"email": user_email})
                 if request_user is not None and request_user.get('_id') != ObjectId(args['id']):
                     projection['email'] = 0
+                    projection['username'] = 0
             else:
                 projection['email'] = 0
-        elif args['email'] is not None:
-            query = {'email': args['email']}
+                projection['username'] = 0
         elif args['keyword'] is not None:
             projection['email'] = 0
-            subquery = [{"username": {"$regex": ".*{}.*".format(args['keyword'].encode('utf-8'))}}]
+            projection['username'] = 0
+            subquery = [{"nickname": {"$regex": ".*{}.*".format(args['keyword'].encode('utf-8'))}}]
             query = {"$or": subquery}
-
+        if query is None:
+            return json.loads(str(Response(success=False, data=results))), 404
         raw_results = db.user.find(filter=query, limit=limit, projection=projection)
         for result in raw_results:
             results.append(sanitize_user_return_data(result))

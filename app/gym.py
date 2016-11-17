@@ -96,16 +96,25 @@ class Merchandise(Resource):
         limit = args['find'] if args['find'] is not None else 0
         results = []
         query = None
-        if args['id'] is not None:
+        if request.headers.get('Authorization'):
+            auth_type, token = request.headers['Authorization'].split(None, 1)
+            claim = jwt.decode(token=token, key=current_app.secret_key, algorithms='HS512',
+                               options={'verify_exp': False})
+            query = {"owner": ObjectId(claim.get('id'))}
+        elif args['id'] is not None:
             query = {"_id": ObjectId(args['id'])}
-        if args['owner'] is not None:
-            query = {"owner": ObjectId(args['owner'])}
-        if args['keyword'] is not None:
-            subquery = [{"name": {"$regex": ".*{}.*".format(args['keyword'].encode('utf-8'))}},
-                        {"tag": {"$regex": ".*{}.*".format(args['keyword'].encode('utf-8'))}},
-                        {"detail": {"$regex": ".*{}.*".format(args['keyword'].encode('utf-8'))}},
-                        {"summary": {"$regex": ".*{}.*".format(args['keyword'].encode('utf-8'))}}]
-            query = {"$or": subquery}
+        else:
+            if args['owner'] is not None:
+                query = {"owner": ObjectId(args['owner'])}
+            if args['keyword'] is not None:
+                query = {}
+                subquery = [{"name": {"$regex": ".*{}.*".format(args['keyword'].encode('utf-8'))}},
+                            {"tag": {"$regex": ".*{}.*".format(args['keyword'].encode('utf-8'))}},
+                            {"detail": {"$regex": ".*{}.*".format(args['keyword'].encode('utf-8'))}},
+                            {"summary": {"$regex": ".*{}.*".format(args['keyword'].encode('utf-8'))}}]
+                query["$or"] = subquery
+        if query is None:
+            return json.loads(str(Response(success=False, data=results))), 200
         raw_results = db.merchandise.find(filter=query, limit=limit)
         for result in raw_results:
             results.append(sanitize_merchandise_return_data(result))
@@ -293,13 +302,16 @@ class Gym(Resource):
             if args['min'] is not None and args['min'] > 0:
                 near_target['$minDistance'] = args['min']
             query = {'geoLocation': {'$near': near_target}}
-        elif args['keyword'] is not None:
+        if args['keyword'] is not None:
+            if query is None:
+                query = {}
             projection['email'] = 0
             subquery = [{"name": {"$regex": ".*{}.*".format(args['keyword'].encode('utf-8'))}},
                         {"address": {"$regex": ".*{}.*".format(args['keyword'].encode('utf-8'))}},
                         {"detail": {"$regex": ".*{}.*".format(args['keyword'].encode('utf-8'))}}]
-            query = {"$or": subquery}
-
+            query["$or"] = subquery
+        if query is None:
+            return json.loads(str(Response(success=False, data=results))), 404
         raw_results = db.gym.find(filter=query, limit=limit, projection=projection)
         for result in raw_results:
             results.append(sanitize_gym_return_data(result))
@@ -443,9 +455,11 @@ class Sync(Resource):
         return Response(success=True,
                         data={'gym': gym, 'merchandises': merchandises}).__dict__, 200
 
+merchandise_api = Blueprint("merchandise_api", __name__, url_prefix='/api/merchandise')
+merchandise_api_router = Api(merchandise_api)
+merchandise_api_router.add_resource(Merchandise, '/')
 
 gym_api = Blueprint("gym_api", __name__, url_prefix='/api/gym')
 gym_api_router = Api(gym_api)
 gym_api_router.add_resource(Gym, '/')
-gym_api_router.add_resource(Merchandise, '/merchandise')
 gym_api_router.add_resource(Sync, '/sync')
