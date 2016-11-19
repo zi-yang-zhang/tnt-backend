@@ -74,11 +74,10 @@ def user_pw_auth_failed():
 #     return sha256_crypt.verify(password, user['hashed_password'])
 
 
-@resource_access_auth.verify_token
+@user_auth.verify_token
 def verify_token(token):
     try:
-        claim = jwt.decode(token=token, key=app.secret_key, algorithms='HS256', options={'verify_exp': False})
-        app.logger.info('Request received from %s, level %s', claim.get('user'), claim.get('level'))
+        jwt.decode(token=token, key=app.secret_key, algorithms='HS512', options={'verify_exp': False})
     except JWTError as e:
         app.logger.error("jwt not verified: %s", type(e).__name__)
         return False

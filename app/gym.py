@@ -436,7 +436,7 @@ def validate_privilege_for_gym():
     claim = jwt.decode(token=token, key=current_app.secret_key, algorithms='HS512',
                        options={'verify_exp': False})
     gym_id = claim.get('id')
-    request_gym = db.gym.find_one(filter={"_id": gym_id})
+    request_gym = db.gym.find_one(filter={"_id": ObjectId(gym_id)})
     if request_gym is None:
         raise exception.AttemptedToAccessRestrictedResourceError("Gym")
     return gym_id
@@ -453,7 +453,7 @@ class Sync(Resource):
         for result in raw_results:
             merchandises.append(sanitize_merchandise_return_data(result))
         return Response(success=True,
-                        data={'gym': gym, 'merchandises': merchandises}).__dict__, 200
+                        data={'gym': sanitize_gym_return_data(gym), 'merchandises': merchandises}).__dict__, 200
 
 merchandise_api = Blueprint("merchandise_api", __name__, url_prefix='/api/merchandise')
 merchandise_api_router = Api(merchandise_api)
