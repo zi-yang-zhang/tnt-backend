@@ -179,7 +179,6 @@ def create_app():
         r.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
         r.headers["Pragma"] = "no-cache"
         r.headers["Expires"] = "0"
-        r.headers['Cache-Control'] = 'public, max-age=0'
         r.headers['Content-Type'] = 'application/json'
         try:
             payload = json.loads(r.get_data())

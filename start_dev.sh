@@ -44,5 +44,7 @@ docker-compose -f tnt-dev.yml build
 
 #echo "image built, launching"
 #
+docker-compose -f tnt-dev.yml down
+
 docker-compose -f tnt-dev.yml up
 

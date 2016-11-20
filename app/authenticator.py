@@ -31,6 +31,7 @@ SESSION_TIMEOUT = 2628000
 AUTHENTICATION_TYPE = ["password", "wechat"]
 CLIENT_TYPE = {"gym": 1, "user": 2}
 
+
 def authentication_method(auth_method):
     if auth_method is None or auth_method == "" or not isinstance(auth_method, dict) or auth_method.get(
             'type') is None or auth_method.get(
