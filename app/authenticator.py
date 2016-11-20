@@ -1,21 +1,11 @@
-import base64
-from calendar import timegm
-from datetime import datetime
-
 from bson import ObjectId
-from flask import request, make_response, current_app as app, jsonify
-
-from exception import AuthenticationUserPasswordWrong, JWTNotVerified
-from basic_response import Response, ErrorResponse
+from flask import current_app as app, jsonify, Blueprint
+from flask_restful import Api, Resource
 from flask_httpauth import HTTPTokenAuth, HTTPDigestAuth, MultiAuth
-from flask_restful import Resource
 from jose import jwt, JWTError
-from passlib.hash import sha256_crypt
-
-from database import USER_LEVEL
-
-from flask import Blueprint
-from flask_restful import Api
+import time_tools
+from basic_response import Response, ErrorResponse
+from exception import AuthenticationUserPasswordWrong, JWTNotVerified
 
 auth_api = Blueprint('auth_api', __name__)
 auth_api_router = Api(auth_api)
@@ -29,6 +19,8 @@ WECHAT_Gym_AUTH_SCHEME = 'Wechat-Gym-Auth'
 admin_token_auth = HTTPTokenAuth(scheme='tnt-admin-auth-scheme', realm='admin')
 resource_access_auth = HTTPTokenAuth(scheme='Bearer', realm='resource')
 user_auth = HTTPTokenAuth(scheme='Bearer', realm='user')
+gym_auth = HTTPTokenAuth(scheme='Bearer', realm='gym')
+
 user_login_pw_authenticator = HTTPDigestAuth(scheme=TNT_USER_AUTH_SCHEME, realm='user', use_ha1_pw=True)
 user_login_authenticator = MultiAuth(main_auth=user_login_pw_authenticator)
 
@@ -37,8 +29,7 @@ gym_login_pw_authenticator = HTTPDigestAuth(scheme=TNT_GYM_AUTH_SCHEME, realm='g
 SESSION_TIMEOUT = 2628000
 
 AUTHENTICATION_TYPE = ["password", "wechat"]
-CLIENT_TYPE = ["gym", "user"]
-
+CLIENT_TYPE = {"gym": 1, "user": 2}
 
 def authentication_method(auth_method):
     if auth_method is None or auth_method == "" or not isinstance(auth_method, dict) or auth_method.get(
@@ -60,9 +51,13 @@ def user_pw_auth_failed():
 
 
 @user_auth.error_handler
-def user_pw_auth_failed():
+def user_jwt_auth_failed():
     return jsonify(ErrorResponse(JWTNotVerified()).__dict__)
 
+
+@gym_auth.error_handler
+def gym_jwt_auth_failed():
+    return jsonify(ErrorResponse(JWTNotVerified()).__dict__)
 
 # @admin_token_auth.verify_token
 # def verify_token(token):
@@ -74,14 +69,47 @@ def user_pw_auth_failed():
 #     return sha256_crypt.verify(password, user['hashed_password'])
 
 
-@user_auth.verify_token
+@gym_auth.verify_token
 def verify_token(token):
     try:
-        jwt.decode(token=token, key=app.secret_key, algorithms='HS512', options={'verify_exp': False})
+        from flask import current_app
+        claim = jwt.decode(token=token, key=app.secret_key, algorithms='HS512', options={'verify_exp': False})
+        current_app.logger.debug(claim)
+        if claim.get('type') and claim.get('id') and claim.get('type') == CLIENT_TYPE["gym"]:
+            from database import gym_db as db
+            current_app.logger.debug("is gym jwt")
+            gym = db.gym.find_one({"_id": ObjectId(claim.get('id'))})
+            if not gym:
+                return False
+            else:
+                return True
+        return False
     except JWTError as e:
         app.logger.error("jwt not verified: %s", type(e).__name__)
         return False
-    return True
+
+
+@user_auth.verify_token
+def verify_token(token):
+    try:
+        from flask import current_app
+
+        claim = jwt.decode(token=token, key=app.secret_key, algorithms='HS512', options={'verify_exp': False})
+        current_app.logger.debug(claim)
+
+        if claim.get('type') and claim.get('id') and claim.get('type') == CLIENT_TYPE["user"]:
+            from database import user_db as db
+            current_app.logger.debug("is user jwt")
+
+            user = db.user.find_one({"_id": ObjectId(claim.get('id'))})
+            if not user:
+                return False
+            else:
+                return True
+        return False
+    except JWTError as e:
+        app.logger.error("jwt not verified: %s", type(e).__name__)
+        return False
 
 
 class UserAuthToken(Resource):
@@ -99,8 +127,8 @@ class UserAuthToken(Resource):
             result.update({'merchandiseId': str(result.get("merchandiseId"))})
             result.update({'recipient': str(result.get("recipient"))})
             transaction_records.append(result)
-        issued_time = timegm(datetime.utcnow().utctimetuple())
-        claims = {'iat': issued_time, 'id': str(user['_id']), 'type': CLIENT_TYPE[1]}
+        issued_time = time_tools.get_current_time_second()
+        claims = {'iat': issued_time, 'id': str(user['_id']), 'type': CLIENT_TYPE["user"]}
         return Response(success=True, data={'jwt': jwt.encode(claims=claims, key=app.secret_key, algorithm='HS512'),
                                             'user': api.sanitize_user_return_data(user), 'transactionRecords': transaction_records}).__dict__, 200
 
@@ -116,8 +144,9 @@ class GymAuthToken(Resource):
         raw_results = db.merchandise.find(filter={'owner': gym['_id']}, limit=20)
         for result in raw_results:
             merchandises.append(api.sanitize_merchandise_return_data(result))
-        issued_time = timegm(datetime.utcnow().utctimetuple())
-        claims = {'iat': issued_time, 'id': str(gym['_id']), 'type': CLIENT_TYPE[0]}
+        issued_time = time_tools.get_current_time_second()
+
+        claims = {'iat': issued_time, 'id': str(gym['_id']), 'type': CLIENT_TYPE["gym"]}
         return Response(success=True, data={'jwt': jwt.encode(claims=claims, key=app.secret_key, algorithm='HS512'),
                                             'gym': api.sanitize_gym_return_data(gym), 'merchandises': merchandises}).__dict__, 200
 

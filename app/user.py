@@ -1,18 +1,13 @@
-from calendar import timegm
-from datetime import datetime
-
 from bson.objectid import ObjectId
-from flask import Blueprint
-from flask import json
-from flask import make_response
-from flask import request, current_app
+from flask import Blueprint, json, make_response, request, current_app
 from flask_restful import Resource, reqparse, Api
 from jose import jwt
 
+import time_tools
 from authenticator import user_login_pw_authenticator, AUTHENTICATION_TYPE, authentication_method, user_auth, \
     CLIENT_TYPE
 from basic_response import Response
-from database import user_db as db, USER_LEVEL
+from database import user_db as db
 from exception import InvalidResourceStructureError, InvalidResourceParameterError, InvalidIdUpdateRequestError, \
     AuthenticationUserNotFound, AuthenticationUserAuthTypeError
 from utils import non_empty_str, non_empty_and_no_space_str
@@ -173,8 +168,8 @@ class User(Resource):
         validate_user_entry_data_for_creation()
         new_user_id = db.user.insert_one(args).inserted_id
         new_user = db.user.find_one(filter={'_id': ObjectId(new_user_id)}, projection={'authMethod': 0})
-        issued_time = timegm(datetime.utcnow().utctimetuple())
-        claims = {'iat': issued_time, 'id': str(new_user['_id']), 'type': CLIENT_TYPE[1]}
+        issued_time = time_tools.get_current_time_second()
+        claims = {'iat': issued_time, 'id': str(new_user['_id']), 'type': CLIENT_TYPE["user"]}
         # create_im_useuser_authr(user_id=new_id, username=args['username'], email=args['email'], nickname=args['nickname'])
         return make_response(Response(success=True, data={'jwt': jwt.encode(claims=claims, key=current_app.secret_key, algorithm='HS512'),
                                                           'user': sanitize_user_return_data(new_user)}).get_resp(), 201)

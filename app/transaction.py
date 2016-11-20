@@ -1,8 +1,5 @@
-from calendar import timegm
-from datetime import datetime
 
-import dateutil.parser
-
+import time_tools
 from authenticator import CLIENT_TYPE
 from utils import bearer_header_str
 from bson import ObjectId
@@ -41,7 +38,7 @@ class Consume(Resource):
             raise TransactionRecordInvalidState(transaction_record_id, transaction_record.get('transactionState'))
         if transaction_record.get('expiryInfo').get('type') == EXPIRY_INFO_TYPE["by_count"]:
             exp_date = transaction_record.get('expiryInfo').get('expiryDate')
-            if dateutil.parser.parse(exp_date) < datetime.utcnow():
+            if time_tools.is_expired(exp_date):
                 update_command = {'$set': {'transactionState': TRANSACTION_STATE["expired"]}}
                 transaction_db.transaction.update_one({"_id": ObjectId(transaction_record_id)}, update_command)
                 raise TransactionRecordExpired(transaction_record_id)
@@ -54,20 +51,20 @@ class Consume(Resource):
                 update_query = {'expiryInfo.count': updated_count}
                 if updated_count == 0:
                     update_query['transactionState'] = TRANSACTION_STATE["expired"]
-                update_command = {'$set': update_query, '$push': {'visitRecords': {'date': str(datetime.datetime.utcnow())}}}
+                update_command = {'$set': update_query, '$push': {'visitRecords': {'date': time_tools.get_current_time_iso()}}}
                 transaction_db.transaction.update_one({"_id": ObjectId(transaction_record_id)}, update_command)
                 return Response(success=True).__dict__, 200
         elif transaction_record.get('expiryInfo').get('type') == EXPIRY_INFO_TYPE["by_duration"]:
             start_date = transaction_record.get('createdDate')
-            expiry_date = timegm(dateutil.parser.parse(start_date).utctimetuple()) + transaction_record.get(
+            expiry_date = time_tools.to_second(start_date) + transaction_record.get(
                 'expiryInfo').get('duration')
-            if datetime.utcfromtimestamp(expiry_date) < datetime.utcnow():
+            if time_tools.is_expired(expiry_date):
                 update_query = {'transactionState': TRANSACTION_STATE["expired"]}
                 update_command = {'$set': update_query}
                 transaction_db.transaction.update_one({"_id": ObjectId(transaction_record_id)}, update_command)
                 raise TransactionRecordExpired(transaction_record_id)
             else:
-                update_command = {'$push': {'visitRecords': {'date': str(datetime.datetime.utcnow())}}}
+                update_command = {'$push': {'visitRecords': {'date': time_tools.get_current_time_iso()}}}
                 transaction_db.transaction.update_one({"_id": ObjectId(transaction_record_id)}, update_command)
                 return Response(success=True).__dict__, 200
 
@@ -160,7 +157,7 @@ class Transaction:
                        "paymentMethod": self.payment_method,
                        "merchandiseId": merchandise.get('_id'),
                        "transactionState": TRANSACTION_STATE["pending"],
-                       "createdDate": str(datetime.datetime.utcnow()),
+                       "createdDate": time_tools.get_current_time_iso(),
                        "expiryInfo": merchandise.get('expiryInfo'),
                        "visitRecords": []
                        }
@@ -189,10 +186,10 @@ class TransactionRecord(Resource):
         target_id = claim.get('id')
         client_type = claim.get('type')
         results = []
-        if client_type == CLIENT_TYPE[1]:
+        if client_type == CLIENT_TYPE["user"]:
             user_result = user_db.user.find_one({"_id": ObjectId(target_id)})
             query = {'payer': user_result['email']}
-        elif client_type == CLIENT_TYPE[0]:
+        elif client_type == CLIENT_TYPE["gym"]:
             gym_result = gym_db.gym.find_one({"_id": ObjectId(target_id)})
             query = {'recipient': gym_result.get('_id')}
         else:
