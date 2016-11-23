@@ -178,6 +178,8 @@ class TransactionRecord(Resource):
 
     def get(self):
         parser = reqparse.RequestParser()
+        parser.add_argument('merchandise_id', location='args', type=ObjectId, nullable=False, trim=True)
+        parser.add_argument('find', location='args', type=int, nullable=False, trim=True)
         parser.add_argument('Authorization', trim=True, type=bearer_header_str, nullable=False, location='headers', required=True, help='Needs to be logged in to view transaction records')
         args = parser.parse_args()
         token = args['Authorization']
@@ -186,16 +188,22 @@ class TransactionRecord(Resource):
         target_id = claim.get('id')
         client_type = claim.get('type')
         results = []
+        query = {}
         if client_type == CLIENT_TYPE["user"]:
             user_result = user_db.user.find_one({"_id": ObjectId(target_id)})
-            query = {'payer': user_result['email']}
+            owner_query = {'payer': user_result['email']}
         elif client_type == CLIENT_TYPE["gym"]:
             gym_result = gym_db.gym.find_one({"_id": ObjectId(target_id)})
-            query = {'recipient': gym_result.get('_id')}
+            owner_query = {'recipient': gym_result.get('_id')}
         else:
             response = Response(success=False, data=[]).__dict__
             return response, 404
-        raw_results = transaction_db.transaction.find(filter=query)
+        if args.get('merchandise_id'):
+            query['$and'] = [owner_query, {'merchandiseId': args.get('merchandise_id')}]
+        else:
+            query = owner_query
+        limit = args['find'] if args['find'] is not None else 0
+        raw_results = transaction_db.transaction.find(filter=query, limit=limit)
         for result in raw_results:
             result.update({'_id': str(result.get("_id"))})
             result.update({'merchandiseId': str(result.get("merchandiseId"))})

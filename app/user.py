@@ -3,6 +3,7 @@ from flask import Blueprint, json, make_response, request, current_app
 from flask_restful import Resource, reqparse, Api
 from jose import jwt
 
+import exception
 import time_tools
 from authenticator import user_login_pw_authenticator, AUTHENTICATION_TYPE, authentication_method, user_auth, \
     CLIENT_TYPE
@@ -178,8 +179,13 @@ class User(Resource):
 class Sync(Resource):
     @user_auth.login_required
     def get(self):
-        target_id = sanitize_user_return_data()
+        auth_type, token = request.headers['Authorization'].split(None, 1)
+        claim = jwt.decode(token=token, key=current_app.secret_key, algorithms='HS512',
+                           options={'verify_exp': False})
+        target_id = claim.get('id')
         user = db.user.find_one(filter={'_id': ObjectId(target_id)}, projection={'authMethod': 0})
+        if not user:
+            raise exception.AuthenticationUserNotFound
         transaction_records = []
         from database import transaction_db
         raw_results = transaction_db.transaction.find(filter={'payer': user['email']})
@@ -189,7 +195,7 @@ class Sync(Resource):
             result.update({'recipient': str(result.get("recipient"))})
             transaction_records.append(result)
         return Response(success=True,
-                        data={'user': user, 'transactionRecords': transaction_records}).__dict__, 200
+                        data={'user': sanitize_user_return_data(user), 'transactionRecords': transaction_records}).__dict__, 200
 
 
 user_api = Blueprint("user_api", __name__, url_prefix='/api/user')

@@ -62,11 +62,11 @@ def create_app():
         response.status_code = 401
         return response
 
-    @application.errorhandler(TypeError)
-    def handle_invalid_usage(error):
-        response = jsonify(ErrorResponse(error).__dict__)
-        response.status_code = 400
-        return response
+    # @application.errorhandler(TypeError)
+    # def handle_invalid_usage(error):
+    #     response = jsonify(ErrorResponse(error).__dict__)
+    #     response.status_code = 400
+    #     return response
 
     @application.errorhandler(InvalidId)
     def handle_invalid_usage(error):
