@@ -81,7 +81,10 @@ def sanitize_merchandise_return_data(data=None):
             data.update({'imageURLs': []})
         gym_id = data.get('owner')
         created_date_iso = data.get('createdDate').isoformat()
-        data.update({'exp_remain': time_tools.get_remaining_time_in_second(data.get('createdDate'), data.get('duration'))})
+        if data.get('duration') == -1:
+            data.update({'exp_remain': -1})
+        else:
+            data.update({'exp_remain': time_tools.get_remaining_time_in_second(data.get('createdDate'), data.get('duration'))})
         data.update({'createdDate': created_date_iso})
         expiry_info = data.get('expiryInfo')
         if expiry_info.get('type') == EXPIRY_INFO_TYPE["by_count"]:
