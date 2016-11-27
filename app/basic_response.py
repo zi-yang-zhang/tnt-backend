@@ -31,7 +31,11 @@ class MongoErrorResponse(Response):
 class InvalidRequestParamErrorResponse(Response):
     def __init__(self, message):
         super(InvalidRequestParamErrorResponse, self).__init__(success=False)
-        self.exceptionMessage = message
+        exception_message = ""
+        for field in message.keys():
+            exception_message += field + ": "
+            exception_message += message.get(field)
+        self.exceptionMessage = exception_message
 
 
 class ErrorResponse(Response):

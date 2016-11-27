@@ -1,19 +1,17 @@
-
-import time_tools
-from authenticator import CLIENT_TYPE
-from utils import bearer_header_str
 from bson import ObjectId
 from flask import Blueprint, current_app as app
 from flask_restful import Api, reqparse, Resource
 from jose import jwt
 
+import time_tools
+from authenticator import CLIENT_TYPE
 from basic_response import Response
 from database import transaction_db, gym_db, user_db
 from exception import TransactionPaymentMethodNotSupported, \
     TransactionUserNotFound, TransactionMerchandiseNotFound, TransactionRecordNotFound, TransactionRecordInvalidState, \
     TransactionRecordExpired, TransactionRecordCountUsedUp
 from gym import EXPIRY_INFO_TYPE
-from utils import non_empty_str
+from utils import bearer_header_str, non_empty_str
 
 SUPPORTED_PAYMENT_METHOD = {'wechat'}
 TRANSACTION_STATE = {"pending": 1, "success": 2, "failed": 3, "canceled": 4, "expired": 5}
@@ -25,6 +23,8 @@ def verify_wechat_transaction(transaction_id):
 
 
 class Consume(Resource):
+
+
     def post(self):
         parser = reqparse.RequestParser()
         parser.add_argument('transactionRecordId', required=True, trim=True, type=non_empty_str, nullable=False,
@@ -34,11 +34,15 @@ class Consume(Resource):
         transaction_record = transaction_db.transaction.find_one({"_id": ObjectId(transaction_record_id)})
         if transaction_record is None:
             raise TransactionRecordNotFound(transaction_record_id)
+        if transaction_record.get('transactionState') == TRANSACTION_STATE["expired"]:
+            raise TransactionRecordExpired(transaction_record_id)
         if transaction_record.get('transactionState') != TRANSACTION_STATE["success"]:
             raise TransactionRecordInvalidState(transaction_record_id, transaction_record.get('transactionState'))
         if transaction_record.get('expiryInfo').get('type') == EXPIRY_INFO_TYPE["by_count"]:
-            exp_date = transaction_record.get('expiryInfo').get('expiryDate')
-            if time_tools.is_expired(exp_date):
+            exp_date = time_tools.to_second(transaction_record.get('expiryInfo').get('expiryDate'))
+            from flask import current_app as app
+            app.logger.debug(exp_date)
+            if exp_date != "" and time_tools.is_expired(exp_date):
                 update_command = {'$set': {'transactionState': TRANSACTION_STATE["expired"]}}
                 transaction_db.transaction.update_one({"_id": ObjectId(transaction_record_id)}, update_command)
                 raise TransactionRecordExpired(transaction_record_id)
@@ -51,7 +55,7 @@ class Consume(Resource):
                 update_query = {'expiryInfo.count': updated_count}
                 if updated_count == 0:
                     update_query['transactionState'] = TRANSACTION_STATE["expired"]
-                update_command = {'$set': update_query, '$push': {'visitRecords': {'date': time_tools.get_current_time_iso()}}}
+                update_command = {'$set': update_query, '$push': {'visitRecords': {'date': time_tools.get_current_time()}}}
                 transaction_db.transaction.update_one({"_id": ObjectId(transaction_record_id)}, update_command)
                 return Response(success=True).__dict__, 200
         elif transaction_record.get('expiryInfo').get('type') == EXPIRY_INFO_TYPE["by_duration"]:
@@ -64,12 +68,13 @@ class Consume(Resource):
                 transaction_db.transaction.update_one({"_id": ObjectId(transaction_record_id)}, update_command)
                 raise TransactionRecordExpired(transaction_record_id)
             else:
-                update_command = {'$push': {'visitRecords': {'date': time_tools.get_current_time_iso()}}}
+                update_command = {'$push': {'visitRecords': {'date': time_tools.get_current_time()}}}
                 transaction_db.transaction.update_one({"_id": ObjectId(transaction_record_id)}, update_command)
                 return Response(success=True).__dict__, 200
 
 
 class Verify(Resource):
+
     def post(self):
         parser = reqparse.RequestParser()
         parser.add_argument('transactionId', required=True, trim=True, type=non_empty_str, nullable=False,
@@ -91,15 +96,13 @@ class Verify(Resource):
         transaction_record = transaction_db.transaction.find_one({"_id": ObjectId(transaction_record_id)})
         data = []
         if transaction_verified:
-            transaction_record.update({'_id': str(transaction_record.get("_id"))})
-            transaction_record.update({'merchandiseId': str(transaction_record.get("merchandiseId"))})
-            transaction_record.update({'recipient': str(transaction_record.get("recipient"))})
-            data.append(transaction_record)
+            data.append(sanitize_transaction_record_result(transaction_record))
         response = Response(success=transaction_verified, data=data).__dict__
         return response, 200
 
 
 class Cancel(Resource):
+
     def post(self):
         parser = reqparse.RequestParser()
         parser.add_argument('transactionRecordId', required=True, type=non_empty_str, nullable=False)
@@ -112,6 +115,7 @@ class Cancel(Resource):
 
 
 class Initiate(Resource):
+
     def post(self):
         app.logger.debug('Initiate transaction')
         parser = reqparse.RequestParser()
@@ -157,7 +161,7 @@ class Transaction:
                        "paymentMethod": self.payment_method,
                        "merchandiseId": merchandise.get('_id'),
                        "transactionState": TRANSACTION_STATE["pending"],
-                       "createdDate": time_tools.get_current_time_iso(),
+                       "createdDate": time_tools.get_current_time(),
                        "expiryInfo": merchandise.get('expiryInfo'),
                        "visitRecords": []
                        }
@@ -205,13 +209,38 @@ class TransactionRecord(Resource):
         limit = args['find'] if args['find'] is not None else 0
         raw_results = transaction_db.transaction.find(filter=query, limit=limit)
         for result in raw_results:
-            result.update({'_id': str(result.get("_id"))})
-            result.update({'merchandiseId': str(result.get("merchandiseId"))})
-            result.update({'recipient': str(result.get("recipient"))})
-            results.append(result)
+            results.append(sanitize_transaction_record_result(result))
         response = Response(success=True, data=results).__dict__
         return response, 200
 
+
+class TransactionRecordAnalysis(Resource):
+
+    def get(self):
+        pass
+
+
+def sanitize_transaction_record_result(transaction_record):
+    transaction_record.update({'_id': str(transaction_record.get("_id"))})
+    transaction_record.update({'merchandiseId': str(transaction_record.get("merchandiseId"))})
+    transaction_record.update({'recipient': str(transaction_record.get("recipient"))})
+    transaction_record.update({'createdDate': transaction_record.get('createdDate').isoformat()})
+    expiry_info = transaction_record.get('expiryInfo')
+    if expiry_info.get('type') == EXPIRY_INFO_TYPE["by_count"]:
+        if expiry_info.get('startDate') != "":
+            start_date_iso = expiry_info.get('startDate').isoformat()
+            expiry_info.update({'startDate': start_date_iso})
+        if expiry_info.get('expiryDate') != "":
+            exp_date_iso = expiry_info.get('expiryDate').isoformat()
+            expiry_info.update({'expiryDate': exp_date_iso})
+            transaction_record.update({'expiryInfo': expiry_info})
+    visit_records = []
+    for visit_record in transaction_record.get('visitRecords'):
+        visit = visit_record.get('date')
+        visit_record.update({'date': visit.isoformat()})
+        visit_records.append(visit_record)
+    transaction_record.update({'visitRecords': visit_records})
+    return transaction_record
 
 transaction_api = Blueprint("transaction_api", __name__, url_prefix='/api/transaction')
 transaction_api_router = Api(transaction_api)

@@ -36,16 +36,22 @@ def merchandise_price(price):
 
 
 def merchandise_expiry_info(expiry_info):
-    if expiry_info is None or expiry_info == "":
-        return {'startDate': "", 'expiryDate': ""}
-    elif expiry_info.get('type') is None or not isinstance(expiry_info.get('type'), int) or expiry_info.get(
+    if expiry_info.get('type') is None or not isinstance(expiry_info.get('type'), int) or expiry_info.get(
             'type') < 0 or expiry_info.get('type') > 2:
         raise ValueError('ExpiryInfo is not well formatted')
     else:
         if expiry_info.get('type') == EXPIRY_INFO_TYPE["by_count"] and expiry_info.get(
-                'startDate') is not None and expiry_info.get('expiryDate') is not None:
+                'startDate') is not None and expiry_info.get('expiryDate') is not None and expiry_info.get('count') is not None and isinstance(expiry_info.get('count'), int) and expiry_info.get('count') > 0:
+            import dateutil.parser
+            from dateutil.tz import tzutc
+            if expiry_info.get('startDate') != "":
+                start_date = dateutil.parser.parse(expiry_info.get('startDate'), tzinfos=tzutc)
+                expiry_info.update({'startDate': start_date})
+            if expiry_info.get('expiryDate') != "":
+                exp_date = dateutil.parser.parse(expiry_info.get('expiryDate'), tzinfos=tzutc)
+                expiry_info.update({'expiryDate': exp_date})
             return expiry_info
-        elif expiry_info.get('type') == EXPIRY_INFO_TYPE["by_duration"] and expiry_info.get('duration') is not None:
+        elif expiry_info.get('type') == EXPIRY_INFO_TYPE["by_duration"] and expiry_info.get('duration') is not None and expiry_info.get('duration') > 0:
             return expiry_info
         else:
             raise ValueError('ExpiryInfo is not well formatted')
@@ -74,7 +80,18 @@ def sanitize_merchandise_return_data(data=None):
         if data.get('imageURLs') is None:
             data.update({'imageURLs': []})
         gym_id = data.get('owner')
+        created_date_iso = data.get('createdDate').isoformat()
         data.update({'exp_remain': time_tools.get_remaining_time_in_second(data.get('createdDate'), data.get('duration'))})
+        data.update({'createdDate': created_date_iso})
+        expiry_info = data.get('expiryInfo')
+        if expiry_info.get('type') == EXPIRY_INFO_TYPE["by_count"]:
+            if expiry_info.get('startDate') != "":
+                start_date_iso = expiry_info.get('startDate').isoformat()
+                expiry_info.update({'startDate': start_date_iso})
+            if expiry_info.get('expiryDate') != "":
+                exp_date_iso = expiry_info.get('expiryDate').isoformat()
+                expiry_info.update({'expiryDate': exp_date_iso})
+            data.update({'expiryInfo': expiry_info})
         data.update({'owner': str(gym_id)})
     return data
 
@@ -199,7 +216,7 @@ class Merchandise(Resource):
             return args
         parser = reqparse.RequestParser()
         merchandise = validate_merchandise_entry_data_for_creation()
-        merchandise["createdDate"] = time_tools.get_current_time_iso()
+        merchandise["createdDate"] = time_tools.get_current_time()
         new_id = db.merchandise.insert_one(merchandise).inserted_id
         new_merchandise = db.merchandise.find_one({"_id": new_id})
 
