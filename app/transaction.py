@@ -25,39 +25,38 @@ def verify_wechat_transaction(transaction_id):
 
 class Consume(Resource):
 
-
     def post(self):
         parser = reqparse.RequestParser()
-        parser.add_argument('transactionRecordId', required=True, trim=True, type=non_empty_str, nullable=False,
+        parser.add_argument('transactionRecordId', required=True, trim=True, type=ObjectId, nullable=False,
                             help='transactionRecordId is required')
         args = parser.parse_args()
         transaction_record_id = args['transactionRecordId']
-        transaction_record = transaction_db.transaction.find_one({"_id": ObjectId(transaction_record_id)})
+        transaction_record = transaction_db.transaction.find_one({"_id": transaction_record_id})
         if transaction_record is None:
-            raise TransactionRecordNotFound(transaction_record_id)
+            raise TransactionRecordNotFound(str(transaction_record_id))
         if transaction_record.get('transactionState') == TRANSACTION_STATE["expired"]:
-            raise TransactionRecordExpired(transaction_record_id)
+            raise TransactionRecordExpired(str(transaction_record_id))
         if transaction_record.get('transactionState') != TRANSACTION_STATE["success"]:
-            raise TransactionRecordInvalidState(transaction_record_id, transaction_record.get('transactionState'))
+            raise TransactionRecordInvalidState(str(transaction_record_id), transaction_record.get('transactionState'))
         if transaction_record.get('expiryInfo').get('type') == EXPIRY_INFO_TYPE["by_count"]:
             exp_date = time_tools.to_second(transaction_record.get('expiryInfo').get('expiryDate'))
             from flask import current_app as app
             app.logger.debug(exp_date)
             if exp_date != "" and time_tools.is_expired(exp_date):
                 update_command = {'$set': {'transactionState': TRANSACTION_STATE["expired"]}}
-                transaction_db.transaction.update_one({"_id": ObjectId(transaction_record_id)}, update_command)
-                raise TransactionRecordExpired(transaction_record_id)
+                transaction_db.transaction.update_one({"_id": transaction_record_id}, update_command)
+                raise TransactionRecordExpired(str(transaction_record_id))
             elif transaction_record.get('expiryInfo').get('count') <= 0:
                 update_command = {'$set': {'transactionState': TRANSACTION_STATE["expired"]}}
-                transaction_db.transaction.update_one({"_id": ObjectId(transaction_record_id)}, update_command)
-                raise TransactionRecordCountUsedUp(transaction_record_id)
+                transaction_db.transaction.update_one({"_id": transaction_record_id}, update_command)
+                raise TransactionRecordCountUsedUp(str(transaction_record_id))
             else:
                 updated_count = transaction_record.get('expiryInfo').get('count') - 1
                 update_query = {'expiryInfo.count': updated_count}
                 if updated_count == 0:
                     update_query['transactionState'] = TRANSACTION_STATE["expired"]
                 update_command = {'$set': update_query, '$push': {'visitRecords': {'date': time_tools.get_current_time()}}}
-                transaction_db.transaction.update_one({"_id": ObjectId(transaction_record_id)}, update_command)
+                transaction_db.transaction.update_one({"_id": transaction_record_id}, update_command)
                 return Response(success=True).__dict__, 200
         elif transaction_record.get('expiryInfo').get('type') == EXPIRY_INFO_TYPE["by_duration"]:
             start_date = transaction_record.get('createdDate')
@@ -66,11 +65,11 @@ class Consume(Resource):
             if time_tools.is_expired(expiry_date):
                 update_query = {'transactionState': TRANSACTION_STATE["expired"]}
                 update_command = {'$set': update_query}
-                transaction_db.transaction.update_one({"_id": ObjectId(transaction_record_id)}, update_command)
-                raise TransactionRecordExpired(transaction_record_id)
+                transaction_db.transaction.update_one({"_id": transaction_record_id}, update_command)
+                raise TransactionRecordExpired(str(transaction_record_id))
             else:
                 update_command = {'$push': {'visitRecords': {'date': time_tools.get_current_time()}}}
-                transaction_db.transaction.update_one({"_id": ObjectId(transaction_record_id)}, update_command)
+                transaction_db.transaction.update_one({"_id": transaction_record_id}, update_command)
                 return Response(success=True).__dict__, 200
 
 
@@ -106,11 +105,11 @@ class Cancel(Resource):
 
     def post(self):
         parser = reqparse.RequestParser()
-        parser.add_argument('transactionRecordId', required=True, type=non_empty_str, nullable=False)
+        parser.add_argument('transactionRecordId', required=True, type=ObjectId, nullable=False)
         args = parser.parse_args()
         transaction_record_id = args['transactionRecordId']
         update_query = {'$set': {"transactionState": TRANSACTION_STATE["canceled"]}}
-        transaction_db.transaction.update_one({"_id": ObjectId(transaction_record_id)}, update_query)
+        transaction_db.transaction.update_one({"_id": transaction_record_id}, update_query)
         response = Response(success=True).__dict__
         return response, 200
 
@@ -196,6 +195,8 @@ class TransactionRecord(Resource):
         query = {}
         if client_type == CLIENT_TYPE["user"]:
             user_result = user_db.user.find_one({"_id": ObjectId(target_id)})
+            if not user_result:
+                raise TransactionUserNotFound(target_id)
             owner_query = {'payer': user_result['email']}
         elif client_type == CLIENT_TYPE["gym"]:
             owner_query = {'recipient': ObjectId(target_id)}
@@ -264,6 +265,32 @@ class TransactionRecordAnalysis(Resource):
         return response, 200
 
 
+class VisitRecord(Resource):
+    @gym_auth.login_required
+    def get(self):
+        parser = reqparse.RequestParser()
+        parser.add_argument('transactionRecordId', required=True, trim=True, type=ObjectId, nullable=False, location='args',
+                            help='transactionRecordId is required')
+        args = parser.parse_args()
+        transaction_record_id = args['transactionRecordId']
+        transaction_record = transaction_db.transaction.find_one({"_id": transaction_record_id})
+        if not transaction_record:
+            raise TransactionRecordNotFound(str(transaction_record_id))
+        else:
+            return Response(success=True, data=sanitize_visit_records(transaction_record["visitRecords"])).__dict__, 200
+
+
+def sanitize_visit_records(visit_records=None):
+    if visit_records is None:
+        return []
+    sanitized = []
+    for visit_record in visit_records:
+        visit = visit_record.get('date')
+        visit_record.update({'date': visit.isoformat()})
+        sanitized.append(visit_record)
+    return sanitized
+
+
 def sanitize_transaction_record_result(transaction_record):
     transaction_record.update({'_id': str(transaction_record.get("_id"))})
     transaction_record.update({'merchandiseId': str(transaction_record.get("merchandiseId"))})
@@ -278,11 +305,7 @@ def sanitize_transaction_record_result(transaction_record):
             exp_date_iso = expiry_info.get('expiryDate').isoformat()
             expiry_info.update({'expiryDate': exp_date_iso})
             transaction_record.update({'expiryInfo': expiry_info})
-    visit_records = []
-    for visit_record in transaction_record.get('visitRecords'):
-        visit = visit_record.get('date')
-        visit_record.update({'date': visit.isoformat()})
-        visit_records.append(visit_record)
+    visit_records = sanitize_visit_records(transaction_record.get('visitRecords'))
     transaction_record.update({'visitRecords': visit_records})
     return transaction_record
 
@@ -294,4 +317,6 @@ transaction_api_router.add_resource(Cancel, '/cancel')
 transaction_api_router.add_resource(Consume, '/consume')
 transaction_api_router.add_resource(TransactionRecord, '/')
 transaction_api_router.add_resource(TransactionRecordAnalysis, '/analysis')
+transaction_api_router.add_resource(VisitRecord, '/visit')
+
 
