@@ -1,5 +1,5 @@
 from calendar import timegm
-from datetime import datetime
+from datetime import datetime, timedelta
 import pytz
 import dateutil.parser
 
@@ -14,6 +14,11 @@ def get_current_time_second():
 
 def is_expired(date_second):
     return datetime.fromtimestamp(date_second, tz=pytz.utc) < get_current_time()
+
+
+def get_days_before_current(num_of_days):
+    days = timedelta(days=num_of_days)
+    return get_current_time() - days
 
 
 def to_second(date):

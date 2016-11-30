@@ -12,6 +12,7 @@ from exception import TransactionPaymentMethodNotSupported, \
     TransactionRecordExpired, TransactionRecordCountUsedUp
 from gym import EXPIRY_INFO_TYPE
 from utils import bearer_header_str, non_empty_str
+from authenticator import gym_auth
 
 SUPPORTED_PAYMENT_METHOD = {'wechat'}
 TRANSACTION_STATE = {"pending": 1, "success": 2, "failed": 3, "canceled": 4, "expired": 5}
@@ -182,7 +183,7 @@ class TransactionRecord(Resource):
 
     def get(self):
         parser = reqparse.RequestParser()
-        parser.add_argument('merchandise_id', location='args', type=ObjectId, nullable=False, trim=True)
+        parser.add_argument('merchandiseId', location='args', type=ObjectId, nullable=False, trim=True)
         parser.add_argument('find', location='args', type=int, nullable=False, trim=True)
         parser.add_argument('Authorization', trim=True, type=bearer_header_str, nullable=False, location='headers', required=True, help='Needs to be logged in to view transaction records')
         args = parser.parse_args()
@@ -197,13 +198,12 @@ class TransactionRecord(Resource):
             user_result = user_db.user.find_one({"_id": ObjectId(target_id)})
             owner_query = {'payer': user_result['email']}
         elif client_type == CLIENT_TYPE["gym"]:
-            gym_result = gym_db.gym.find_one({"_id": ObjectId(target_id)})
-            owner_query = {'recipient': gym_result.get('_id')}
+            owner_query = {'recipient': ObjectId(target_id)}
         else:
             response = Response(success=False, data=[]).__dict__
             return response, 404
-        if args.get('merchandise_id'):
-            query['$and'] = [owner_query, {'merchandiseId': args.get('merchandise_id')}]
+        if args.get('merchandiseId'):
+            query['$and'] = [owner_query, {'merchandiseId': args.get('merchandiseId')}]
         else:
             query = owner_query
         limit = args['find'] if args['find'] is not None else 0
@@ -216,8 +216,52 @@ class TransactionRecord(Resource):
 
 class TransactionRecordAnalysis(Resource):
 
-    def get(self):
-        pass
+    @gym_auth.login_required
+    def post(self):
+        parser = reqparse.RequestParser()
+        parser.add_argument('merchandiseId', type=ObjectId, nullable=False, trim=True)
+        parser.add_argument('range', type=long, nullable=False, trim=True, required=True)
+        parser.add_argument('Authorization', trim=True, type=bearer_header_str, nullable=False, location='headers',
+                            required=True, help='Needs to be logged in to view transaction records')
+        args = parser.parse_args()
+        token = args['Authorization']
+        claim = jwt.decode(token=token, key=app.secret_key, algorithms='HS512',
+                           options={'verify_exp': False})
+        target_id = claim.get('id')
+        prev_start = time_tools.get_days_before_current(args.get('range') * 2)
+        prev_end = time_tools.get_days_before_current(args.get('range'))
+        results = []
+        if args.get('merchandiseId'):
+            current_query = {'$and': [{'createdDate': {'$lt': time_tools.get_current_time(), '$gte': prev_end}}, {'recipient': ObjectId(target_id)}, {'merchandiseId': args.get('merchandiseId')}]}
+            prev_query = {'$and': [{'createdDate': {'$lt': prev_end, '$gte': prev_start}}, {'recipient': ObjectId(target_id)}, {'merchandiseId': args.get('merchandiseId')}]}
+            prev_sales = transaction_db.transaction.find(filter=prev_query).count()
+            current_sales = transaction_db.transaction.find(filter=current_query).count()
+            merchandise_result = gym_db.merchandise.find_one({"_id": args.get('merchandiseId')})
+            if prev_sales == 0:
+                percent_dif = 0
+            else:
+                percent_dif = (current_sales - prev_sales) / prev_sales * 100
+            from gym import sanitize_merchandise_return_data
+            results.append({'percent': percent_dif, 'merchandise': sanitize_merchandise_return_data(merchandise_result)})
+        else:
+            raw_results = gym_db.merchandise.find(filter={'owner': ObjectId(target_id)})
+            for result in raw_results:
+                current_query = {'$and': [{'createdDate': {'$lt': time_tools.get_current_time(), '$gte': prev_end}},
+                                          {'recipient': ObjectId(target_id)}, {'merchandiseId': result.get('_id')}]}
+                prev_query = {
+                    '$and': [{'createdDate': {'$lt': prev_end, '$gte': prev_start}}, {'recipient': ObjectId(target_id)},
+                             {'merchandiseId': result.get('_id')}]}
+                prev_sales = transaction_db.transaction.find(filter=prev_query).count()
+                current_sales = transaction_db.transaction.find(filter=current_query).count()
+                if prev_sales == 0:
+                    percent_dif = 0
+                else:
+                    percent_dif = (current_sales - prev_sales) / prev_sales * 100
+                from gym import sanitize_merchandise_return_data
+                results.append(
+                    {'percent': percent_dif, 'merchandise': sanitize_merchandise_return_data(result)})
+        response = Response(success=True, data=results).__dict__
+        return response, 200
 
 
 def sanitize_transaction_record_result(transaction_record):
@@ -249,3 +293,5 @@ transaction_api_router.add_resource(Verify, '/verify')
 transaction_api_router.add_resource(Cancel, '/cancel')
 transaction_api_router.add_resource(Consume, '/consume')
 transaction_api_router.add_resource(TransactionRecord, '/')
+transaction_api_router.add_resource(TransactionRecordAnalysis, '/analysis')
+
