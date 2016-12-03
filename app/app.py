@@ -11,5 +11,6 @@ application = create_app()
 # elif application.debug:
 #     if __name__ == '__main__':
 #         application.run(host="0.0.0.0", debug=True, port=2001)
-if __name__ == '__main__':
-    application.run(host="0.0.0.0", port=80)
+if application.config.get('DEBUG_SERVER'):
+    if __name__ == '__main__':
+        application.run(host="0.0.0.0", port=80)

@@ -3,7 +3,7 @@ FROM python:2.7.11
 MAINTAINER Maintainer robert
 
 # Expose ports
-EXPOSE 3000
+EXPOSE 8000
 
 ## Copy the application folder inside the container
 ADD .  /app
@@ -14,4 +14,4 @@ ENV setting="settings.py"
 
 RUN pip install -r requirements.txt
 
-CMD gunicorn -w 4 app:application
+CMD gunicorn -b 127.0.0.1:8000 -w 4 app:application
