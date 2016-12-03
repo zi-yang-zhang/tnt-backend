@@ -15,7 +15,7 @@ services:
       context: ./app
       dockerfile: /DockerFiles/prod/Dockerfile
     ports:
-      - "3000:80"
+      - "3000"
     links:
       - mongo
     volumes:
