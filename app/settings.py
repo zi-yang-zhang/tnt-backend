@@ -4,3 +4,4 @@ SECRET_KEY = 'secret_key'
 DEBUG_SERVER = False
 SESSION_TYPE = 'mongodb'
 SESSION_MONGODB = client
+PROPAGATE_EXCEPTIONS = True
