@@ -11,6 +11,7 @@ from basic_response import Response
 from database import user_db as db
 from exception import InvalidResourceStructureError, InvalidResourceParameterError, InvalidIdUpdateRequestError, \
     AuthenticationUserNotFound, AuthenticationUserAuthTypeError
+from transaction import sanitize_transaction_record_result
 from utils import non_empty_str, non_empty_and_no_space_str
 
 GENDER = {1: 'male', 2: 'female', 3: 'unknown'}
@@ -190,10 +191,7 @@ class Sync(Resource):
         from database import transaction_db
         raw_results = transaction_db.transaction.find(filter={'payer': user['email']})
         for result in raw_results:
-            result.update({'_id': str(result.get("_id"))})
-            result.update({'merchandiseId': str(result.get("merchandiseId"))})
-            result.update({'recipient': str(result.get("recipient"))})
-            transaction_records.append(result)
+            transaction_records.append(sanitize_transaction_record_result(result))
         return Response(success=True,
                         data={'user': sanitize_user_return_data(user), 'transactionRecords': transaction_records}).__dict__, 200
 
