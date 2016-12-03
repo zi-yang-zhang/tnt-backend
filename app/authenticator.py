@@ -6,7 +6,6 @@ from jose import jwt, JWTError
 import time_tools
 from basic_response import Response, ErrorResponse
 from exception import AuthenticationUserPasswordWrong, JWTNotVerified
-from transaction import sanitize_transaction_record_result
 
 auth_api = Blueprint('auth_api', __name__)
 auth_api_router = Api(auth_api)
@@ -125,6 +124,7 @@ class UserAuthToken(Resource):
         from database import transaction_db
         raw_results = transaction_db.transaction.find(filter={'payer': user['email']})
         for result in raw_results:
+            from transaction import sanitize_transaction_record_result
             transaction_records.append(sanitize_transaction_record_result(result))
         issued_time = time_tools.get_current_time_second()
         claims = {'iat': issued_time, 'id': str(user['_id']), 'type': CLIENT_TYPE["user"]}
