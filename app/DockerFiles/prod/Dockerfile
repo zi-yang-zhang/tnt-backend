@@ -14,4 +14,4 @@ ENV setting="settings.py"
 
 RUN pip install -r requirements.txt
 
-CMD uwsgi --ini uwsgi-config.ini
+CMD gunicorn -w 4 app:application

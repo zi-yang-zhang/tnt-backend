@@ -1,32 +1,31 @@
-ngnix:
-  restart: always
-  build: ./ngnix
-  volumes:
-    - ./app/static:/var/www/tnt-backend/app/static
-  links:
-    - app
-  ports:
-    - "80:80"
+version: '2'
+services:
+  ngnix:
+    restart: always
+    build: ./ngnix
+    volumes:
+      - ./app/static:/var/www/tnt-backend/app/static
+    links:
+      - app
+    ports:
+      - "80:80"
+  app:
+    restart: always
+    build:
+      context: ./app
+      dockerfile: /DockerFiles/dev/Dockerfile
+    ports:
+      - "3000:80"
+    links:
+      - mongo
+    volumes:
+      - ./app:/app
+      - ./tnt/logs/app:/tmp/log
 
-app:
-
-  restart: always
-  build: ./app
-  ports:
-    - "8080"
-  links:
-    - mongo
-  volumes:
-    - ./app:/app
-    - ../log:/tmp/log
-  dockerfile: /DockerFiles/prod/Dockerfile
-
-
-mongo:
-  restart: always
-  image: mongo:3.3.8
-  ports:
-    - "27017:27017"
-  volumes:
-    - ../mongo:/data/db
-
+  mongo:
+    restart: always
+    image: mongo:3.3.15
+    ports:
+      - "27017:27017"
+    volumes:
+      - ./tnt/logs/app-db:/data/db

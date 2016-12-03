@@ -1,5 +1,6 @@
-import os
+from database import client
 
-DEBUG = False
-SECRET_KEY = os.urandom(24)
-DEBUG_SERVER = False
+SECRET_KEY = 'secret_key'
+DEBUG_SERVER = True
+SESSION_TYPE = 'mongodb'
+SESSION_MONGODB = client

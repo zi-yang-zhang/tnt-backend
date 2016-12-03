@@ -4,13 +4,14 @@ from bson.objectid import ObjectId
 from flask import Blueprint, request, current_app
 from flask_restful import Resource, reqparse, Api
 from jose import jwt
+from pymongo import ASCENDING, DESCENDING
 
 import exception
 import time_tools
 from authenticator import gym_auth, gym_login_pw_authenticator, AUTHENTICATION_TYPE, authentication_method, CLIENT_TYPE
 from basic_response import Response
 from database import gym_db as db
-from utils import non_empty_str
+from utils import non_empty_str, bearer_header_str
 
 EXPIRY_INFO_TYPE = {"by_count": 1, "by_duration": 2}
 
@@ -261,9 +262,15 @@ def sanitize_gym_return_data(data=None):
             data.update({'services': []})
         if data.get('announcements') is None:
             data.update({'announcements': []})
+        else:
+            for announcement in data.get('announcements'):
+                announcement.update({'_id': str(announcement.get('_id'))})
+                announcement.update({'createdDate': announcement.get('createdDate').isoformat()})
         if data.get('equipments') is None:
             data.update({'equipments': []})
-        data.update({'geoLocation': {'lng': data.get('geoLocation').get('coordinates')[0], 'lat': data.get('geoLocation').get('coordinates')[1]}})
+        lng = data.get('geoLocation').get('coordinates')[0]
+        lat = data.get('geoLocation').get('coordinates')[1]
+        data.update({'geoLocation': {'lng': lng, 'lat': lat}})
     return data
 
 
@@ -332,24 +339,7 @@ class Gym(Resource):
             return json.loads(str(Response(success=True, data=results)))
 
     @gym_auth.login_required
-    def put(self):
-        def validate_announcement_entry_data(data=None):
-            if data is None:
-                raise exception.InvalidRequestError('announcement')
-            if data.get('title') is None:
-                raise exception.InvalidResourceStructureError('title', 'announcement')
-            if (data.get('content') is None or data.get('content') == "") and (
-                            data.get('imageURLs') is None or data.get('imageURLs').__len__() == 0):
-                raise exception.InvalidResourceStructureError('content', 'announcement')
-            if data.get('scope') is None or data.get('scope') > 2 or data.get('scope') < 1:
-                raise exception.InvalidResourceStructureError('scope', 'announcement')
-            if data.get('actionType') is not None and data.get('actionType') != "":
-                if data.get('actionType').get('type') is None or data.get('actionType').get('type') == "":
-                    raise exception.InvalidResourceStructureError('actionType', 'announcement')
-                if data.get('actionType').get('content') is None or data.get('actionType').get('type') == "":
-                    raise exception.InvalidResourceStructureError('actionType', 'announcement')
-            return data
-
+    def post(self):
         def generate_update_gym_command():
             command = {}
             set_target = {}
@@ -370,7 +360,8 @@ class Gym(Resource):
                 set_target['bigLogo'] = args['bigLogo']
             if args['detail'] is not None:
                 set_target['detail'] = args['detail']
-            command['$set'] = set_target
+            if set_target != {}:
+                command['$set'] = set_target
 
             if args['service'] is not None:
                 if not isinstance(args['service'], list):
@@ -386,7 +377,6 @@ class Gym(Resource):
                 if '$push' not in command:
                     command['$push'] = {}
                 command['$push']['announcements'] = {'$each': announcements}
-
             return command
 
         parser = reqparse.RequestParser()
@@ -396,19 +386,25 @@ class Gym(Resource):
         parser.add_argument('geoLocation', type=float, action='append', nullable=False)
         parser.add_argument('smallLogo')
         parser.add_argument('bigLogo')
-        parser.add_argument('detail')
+        parser.add_argument('detail', type=str, nullable=False)
         parser.add_argument('service', type=dict, action='append')
         parser.add_argument('announcements', type=dict, action='append')
+        parser.add_argument('Authorization', trim=True, type=bearer_header_str, nullable=False, location='headers', required=True, help='Needs to be logged in to delete')
 
         args = parser.parse_args()
-        id_to_update = validate_privilege_for_gym()
+        token = args['Authorization']
+        claim = jwt.decode(token=token, key=current_app.secret_key, algorithms='HS512',
+                           options={'verify_exp': False})
+        id_to_update = claim.get('id')
         update_query = generate_update_gym_command()
         result = db.gym.update_one({"_id": ObjectId(id_to_update)}, update_query)
-        if result.matched_count == 0:
-            raise exception.InvalidIdUpdateRequestError('Gym', id_to_update)
-        return json.loads(str(Response(success=True, data=str(result.upserted_id))))
+        if result.modified_count > 0:
+            result = db.gym.find_one({"_id": ObjectId(id_to_update)})
+            return json.loads(str(Response(success=True, data=sanitize_gym_return_data(result)))), 200
+        else:
+            return json.loads(str(Response(success=True))), 304
 
-    def post(self):
+    def put(self):
         def validate_gym_entry_data_for_creation():
             parser.add_argument('email', required=True, trim=True, type=non_empty_str, nullable=False)
             parser.add_argument('authMethod', required=True, type=authentication_method, nullable=False)
@@ -440,6 +436,49 @@ class Gym(Resource):
         jwt_token = str(jwt.encode(claims=claims, key=current_app.secret_key, algorithm='HS512'))
         return json.loads(str(Response(success=True, data={'jwt': jwt_token, 'gym': sanitize_gym_return_data(new_gym)}))), 201
 
+    @gym_auth.login_required
+    def delete(self):
+        parser = reqparse.RequestParser()
+        parser.add_argument('announcement_ids', location='args', type=str)
+        parser.add_argument('Authorization', trim=True, type=bearer_header_str, nullable=False, location='headers', required=True, help='Needs to be logged in to delete')
+        args = parser.parse_args()
+        token = args['Authorization']
+        claim = jwt.decode(token=token, key=current_app.secret_key, algorithms='HS512',
+                           options={'verify_exp': False})
+        target_id = claim.get('id')
+        if args.get('announcement_ids') and len(args.get('announcement_ids')) > 0:
+            ids = [{'_id': ObjectId(announcement_id)} for announcement_id in args.get('announcement_ids').split(',')]
+            current_app.logger.debug(ids)
+            remove_announcements_query = {'$pull': {'announcements': {'$or': ids}}}
+            result = db.gym.update_one(filter={"_id": ObjectId(target_id)}, update=remove_announcements_query)
+            if result.modified_count > 0:
+                result = db.gym.find_one({"_id": ObjectId(target_id)})
+                return json.loads(str(Response(success=True, data=sanitize_gym_return_data(result)))), 200
+            else:
+                return json.loads(str(Response(success=True))), 304
+        else:
+            return json.loads(str(Response(success=True))), 304
+
+
+def validate_announcement_entry_data(data=None):
+    if data is None:
+        raise exception.InvalidRequestError('announcement')
+    if data.get('title') is None:
+        raise exception.InvalidResourceStructureError('title', 'announcement')
+    if (data.get('content') is None or data.get('content') == "") and (
+                    data.get('imageURLs') is None or data.get('imageURLs').__len__() == 0):
+        raise exception.InvalidResourceStructureError('content', 'announcement')
+    if data.get('scope') is None or data.get('scope') > 2 or data.get('scope') < 1:
+        raise exception.InvalidResourceStructureError('scope', 'announcement')
+    if data.get('actionType') is not None and data.get('actionType') != "":
+        if data.get('actionType').get('type') is None or data.get('actionType').get('type') == "":
+            raise exception.InvalidResourceStructureError('actionType', 'announcement')
+        if data.get('actionType').get('content') is None or data.get('actionType').get('type') == "":
+            raise exception.InvalidResourceStructureError('actionType', 'announcement')
+    data['_id'] = ObjectId()
+    data['createdDate'] = time_tools.get_current_time()
+    return data
+
 
 def validate_privilege_for_gym():
     auth_type, token = request.headers['Authorization'].split(None, 1)
@@ -459,7 +498,7 @@ class Sync(Resource):
         target_id = validate_privilege_for_gym()
         gym = db.gym.find_one({'_id': ObjectId(target_id)})
         merchandises = []
-        raw_results = db.merchandise.find(filter={'owner': ObjectId(target_id)}, limit=20)
+        raw_results = db.merchandise.find(filter={'owner': ObjectId(target_id)}, limit=20).sort('announcements.createdDate', ASCENDING)
         for result in raw_results:
             merchandises.append(sanitize_merchandise_return_data(result))
         return Response(success=True,
