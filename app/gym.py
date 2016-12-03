@@ -15,11 +15,6 @@ from utils import non_empty_str, bearer_header_str
 
 EXPIRY_INFO_TYPE = {"by_count": 1, "by_duration": 2}
 
-# errors = {
-#     'AuthenticationUserNotFound':{
-#
-#     }
-# }
 
 @gym_login_pw_authenticator.get_password
 def verify_pw(email):

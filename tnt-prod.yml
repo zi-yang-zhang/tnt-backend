@@ -19,8 +19,7 @@ services:
     links:
       - mongo
     volumes:
-      - ./app:/app
-      - ./tnt/logs/app:/tmp/log
+      - ~/tnt-data/logs/app:/tmp/log
 
   mongo:
     restart: always
@@ -28,4 +27,4 @@ services:
     ports:
       - "27017:27017"
     volumes:
-      - ./tnt/logs/app-db:/data/db
+      - ~/tnt-data/logs/app-db:/data/db
