@@ -14,4 +14,4 @@ ENV setting="settings.py"
 
 RUN pip install -r requirements.txt
 
-CMD gunicorn -b 127.0.0.1:8000 -w 4 app:application
+CMD gunicorn -b 0.0.0.0:8000 -w 4 app:application
