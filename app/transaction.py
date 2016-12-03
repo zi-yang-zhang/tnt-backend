@@ -94,11 +94,9 @@ class Verify(Resource):
             update_query['transactionState'] = TRANSACTION_STATE["success"]
         transaction_db.transaction.update_one({"_id": ObjectId(transaction_record_id)}, {'$set': update_query})
         transaction_record = transaction_db.transaction.find_one({"_id": ObjectId(transaction_record_id)})
-        data = []
         if transaction_verified:
-            data.append(sanitize_transaction_record_result(transaction_record))
-        response = Response(success=transaction_verified, data=data).__dict__
-        return response, 200
+            return Response(success=transaction_verified, data=sanitize_transaction_record_result(transaction_record)).__dict__, 200
+        return Response(success=transaction_verified).__dict__, 200
 
 
 class Cancel(Resource):
