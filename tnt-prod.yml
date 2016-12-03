@@ -13,7 +13,7 @@ services:
     restart: always
     build:
       context: ./app
-      dockerfile: /DockerFiles/dev/Dockerfile
+      dockerfile: /DockerFiles/prod/Dockerfile
     ports:
       - "3000:80"
     links:
