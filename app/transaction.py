@@ -86,6 +86,8 @@ class Verify(Resource):
         transaction_record = transaction_db.transaction.find_one({"_id": ObjectId(transaction_record_id)})
         if transaction_record is None:
             raise TransactionRecordNotFound(transaction_record_id)
+        if transaction_record.get('transactionState') != TRANSACTION_STATE["pending"]:
+            raise TransactionRecordInvalidState(transaction_record_id, transaction_record.get('transactionState'))
         transaction_verified = verify_wechat_transaction(args['transactionId'])
         update_query = {}
         if not transaction_verified:
@@ -93,9 +95,12 @@ class Verify(Resource):
         else:
             update_query['transactionState'] = TRANSACTION_STATE["success"]
         transaction_db.transaction.update_one({"_id": ObjectId(transaction_record_id)}, {'$set': update_query})
-        transaction_record = transaction_db.transaction.find_one({"_id": ObjectId(transaction_record_id)})
         if transaction_verified:
-            return Response(success=transaction_verified, data=sanitize_transaction_record_result(transaction_record)).__dict__, 200
+            transaction_record = transaction_db.transaction.find_one({"_id": ObjectId(transaction_record_id)})
+            merchandise = gym_db.merchandise.find_one({"_id": ObjectId(transaction_record.get('merchandiseId'))})
+            from gym import sanitize_merchandise_return_data
+            return Response(success=transaction_verified, data={"transactionRecord" :sanitize_transaction_record_result(transaction_record),
+                                                                "merchandise": sanitize_merchandise_return_data(merchandise)}).__dict__, 200
         return Response(success=transaction_verified).__dict__, 200
 
 
@@ -106,6 +111,9 @@ class Cancel(Resource):
         parser.add_argument('transactionRecordId', required=True, type=ObjectId, nullable=False)
         args = parser.parse_args()
         transaction_record_id = args['transactionRecordId']
+        transaction_record = transaction_db.transaction.find_one({"_id": ObjectId(transaction_record_id)})
+        if transaction_record.get('transactionState') != TRANSACTION_STATE["pending"]:
+            raise TransactionRecordInvalidState(transaction_record_id, transaction_record.get('transactionState'))
         update_query = {'$set': {"transactionState": TRANSACTION_STATE["canceled"]}}
         transaction_db.transaction.update_one({"_id": transaction_record_id}, update_query)
         response = Response(success=True).__dict__
