@@ -12,7 +12,7 @@ from database import user_db as db
 from exception import InvalidResourceStructureError, InvalidResourceParameterError, InvalidIdUpdateRequestError, \
     AuthenticationUserNotFound, AuthenticationUserAuthTypeError
 from transaction import sanitize_transaction_record_result
-from utils import non_empty_str, non_empty_and_no_space_str
+from utils import non_empty_str, non_empty_and_no_space_str, bearer_header_str
 
 GENDER = {1: 'male', 2: 'female', 3: 'unknown'}
 
@@ -56,39 +56,39 @@ class User(Resource):
         parser = reqparse.RequestParser()
         parser.add_argument('id', location='args')
         parser.add_argument('keyword', location='args')
+        parser.add_argument('Authorization', trim=True, type=bearer_header_str, nullable=False, location='headers', required=True)
         parser.add_argument('find', type=int, help='number of desire response', location='args')
         args = parser.parse_args()
         limit = args['find'] if args['find'] is not None else 0
         results = []
         projection = {'authMethod': 0}
         query = None
-        if args['id'] is not None:
+        if args.get('id') is not None:
             query = {"_id": ObjectId(args['id'])}
-            if request.headers.get('Authorization') is not None:
-                auth_type, token = request.headers['Authorization'].split(None, 1)
-                claim = jwt.decode(token=token, key=current_app.secret_key, algorithms='HS256',
-                                   options={'verify_exp': False})
-                user_email = claim.get('user')
-                request_user = db.user.find_one(filter={"email": user_email})
-                if request_user is not None and request_user.get('_id') != ObjectId(args['id']):
-                    projection['email'] = 0
-                    projection['username'] = 0
-            else:
-                projection['email'] = 0
-                projection['username'] = 0
-        elif args['keyword'] is not None:
+            projection['email'] = 0
+            projection['username'] = 0
+        elif args.get('keyword') is not None:
             projection['email'] = 0
             projection['username'] = 0
             subquery = [{"nickname": {"$regex": ".*{}.*".format(args['keyword'].encode('utf-8'))}}]
             query = {"$or": subquery}
+        elif args.get('Authorization') is not None:
+            token = args.get('Authorization')
+            current_app.logger.info(token)
+            claim = jwt.decode(token=token, key=current_app.secret_key, algorithms='HS512',
+                               options={'verify_exp': False})
+            target_id = claim.get('id')
+            query = {"_id": ObjectId(target_id)}
+            current_app.logger.info(query)
+
         if query is None:
-            return json.loads(str(Response(success=False, data=results))), 404
+            return json.loads(str(Response(success=False, data=results))), 200
         raw_results = db.user.find(filter=query, limit=limit, projection=projection)
         for result in raw_results:
             results.append(sanitize_user_return_data(result))
         current_app.logger.info('response sent %s', str(Response(success=True, data=results)))
         if len(results) == 0:
-            return json.loads(str(Response(success=False, data=results))), 404
+            return json.loads(str(Response(success=False, data=results))), 200
         else:
             return json.loads(str(Response(success=True, data=results)))
 
