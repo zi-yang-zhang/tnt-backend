@@ -10,7 +10,7 @@ from database import transaction_db, gym_db, user_db
 from exception import TransactionPaymentMethodNotSupported, \
     TransactionUserNotFound, TransactionMerchandiseNotFound, TransactionRecordNotFound, TransactionRecordInvalidState, \
     TransactionRecordExpired, TransactionRecordCountUsedUp
-from gym import EXPIRY_INFO_TYPE
+from gym import EXPIRY_INFO_TYPE, sanitize_merchandise_return_data
 from utils import bearer_header_str, non_empty_str
 from authenticator import gym_auth
 
@@ -97,10 +97,7 @@ class Verify(Resource):
         transaction_db.transaction.update_one({"_id": ObjectId(transaction_record_id)}, {'$set': update_query})
         if transaction_verified:
             transaction_record = transaction_db.transaction.find_one({"_id": ObjectId(transaction_record_id)})
-            merchandise = gym_db.merchandise.find_one({"_id": ObjectId(transaction_record.get('merchandiseId'))})
-            from gym import sanitize_merchandise_return_data
-            return Response(success=transaction_verified, data={"transactionRecord" :sanitize_transaction_record_result(transaction_record),
-                                                                "merchandise": sanitize_merchandise_return_data(merchandise)}).__dict__, 200
+            return Response(success=transaction_verified, data={"transactionRecord" :sanitize_transaction_record_result(transaction_record)}).__dict__, 200
         return Response(success=transaction_verified).__dict__, 200
 
 
@@ -299,7 +296,10 @@ def sanitize_visit_records(visit_records=None):
 
 def sanitize_transaction_record_result(transaction_record):
     transaction_record.update({'_id': str(transaction_record.get("_id"))})
-    transaction_record.update({'merchandiseId': str(transaction_record.get("merchandiseId"))})
+    from database import gym_db
+    merchandise = gym_db.merchandise.find_one({"_id": transaction_record.get("merchandiseId")})
+    del transaction_record["merchandiseId"]
+    transaction_record.update({'merchandise': sanitize_merchandise_return_data(merchandise)})
     transaction_record.update({'recipient': str(transaction_record.get("recipient"))})
     transaction_record.update({'createdDate': transaction_record.get('createdDate').isoformat()})
     expiry_info = transaction_record.get('expiryInfo')

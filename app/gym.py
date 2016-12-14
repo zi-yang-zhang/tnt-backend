@@ -148,6 +148,8 @@ class Merchandise(Resource):
             set_target = {}
             if args['name'] is not None:
                 set_target['name'] = args['name']
+            if args['active'] is not None:
+                set_target['active'] = args['active']
             if args['detail'] is not None:
                 set_target['detail'] = args['detail']
             if args['price'] is not None:
@@ -178,11 +180,13 @@ class Merchandise(Resource):
         parser.add_argument('name', type=non_empty_str, nullable=False)
         parser.add_argument('detail', type=non_empty_str, nullable=False)
         parser.add_argument('expiryInfo', type=merchandise_expiry_info, nullable=False)
+        parser.add_argument('sku', default="", type=str, nullable=False)
         parser.add_argument('tag', default="")
         parser.add_argument('summary', default="")
         parser.add_argument('price', default={'amount': 0, 'currency': "CNY"}, type=merchandise_price)
         parser.add_argument('schedule', type=merchandise_schedule, default=[], action='append')
         parser.add_argument('imageURLs', action='append', default=[])
+        parser.add_argument('active', nullable=False, type=bool)
 
         args = parser.parse_args()
         id_to_update = args['_id']
@@ -200,6 +204,7 @@ class Merchandise(Resource):
             parser.add_argument('detail', required=True, type=non_empty_str, nullable=False)
             parser.add_argument('expiryInfo', required=True, type=merchandise_expiry_info, nullable=False)
             parser.add_argument('duration', required=True, type=long, nullable=False)
+            parser.add_argument('sku', default="", type=str, nullable=False)
             parser.add_argument('tag', default="")
             parser.add_argument('summary', default="")
             parser.add_argument('price', default={'amount': 0, 'currency': "CNY"}, type=merchandise_price)
@@ -221,6 +226,7 @@ class Merchandise(Resource):
         parser = reqparse.RequestParser()
         merchandise = validate_merchandise_entry_data_for_creation()
         merchandise["createdDate"] = time_tools.get_current_time()
+        merchandise["active"] = True
         new_id = db.merchandise.insert_one(merchandise).inserted_id
         new_merchandise = db.merchandise.find_one({"_id": new_id})
 
