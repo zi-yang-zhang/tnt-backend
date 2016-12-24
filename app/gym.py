@@ -334,13 +334,13 @@ class Gym(Resource):
                         {"detail": {"$regex": ".*{}.*".format(args['keyword'].encode('utf-8'))}}]
             query["$or"] = subquery
         if query is None:
-            return json.loads(str(Response(success=False, data=results))), 404
+            return json.loads(str(Response(success=False, data=results)))
         raw_results = db.gym.find(filter=query, limit=limit, projection=projection)
         for result in raw_results:
             results.append(sanitize_gym_return_data(result))
         current_app.logger.info('response sent %s', str(Response(success=True, data=results)))
         if len(results) == 0:
-            return json.loads(str(Response(success=False, data=results))), 404
+            return json.loads(str(Response(success=False, data=results)))
         else:
             return json.loads(str(Response(success=True, data=results)))
 

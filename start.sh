@@ -19,7 +19,7 @@ create(){
     echo Creating log sub-folders: ${APP_LOG_FOLDER}, ${APP_DB_LOG_FOLDER}
     mkdir -p ${APP_LOG_FOLDER} ${APP_DB_LOG_FOLDER}
 
-    chmod 777 -R ${ROOT_FOLDER}
+    chmod -R 777 ${ROOT_FOLDER}
 
 }
 

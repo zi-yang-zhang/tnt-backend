@@ -29,7 +29,7 @@ create_dev_space(){
     echo Creating log sub-folders: ${APP_LOG_FOLDER}, ${APP_DB_LOG_FOLDER}, ${IM_DB_LOG_FOLDER}, ${IM_LOG_FOLDER}
     mkdir -p ${APP_LOG_FOLDER} ${APP_DB_LOG_FOLDER} ${IM_DB_LOG_FOLDER} ${IM_LOG_FOLDER}
 
-    chmod 777 -R ${ROOT_FOLDER}
+    chmod -R 777 ${ROOT_FOLDER}
 
     cp chat_db/ejabberd_creation.sql ${IM_DB_CONF_FOLDER}
 
@@ -47,4 +47,3 @@ docker-compose -f tnt-dev.yml build
 docker-compose -f tnt-dev.yml down
 
 docker-compose -f tnt-dev.yml up
-
